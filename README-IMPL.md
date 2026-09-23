@@ -172,9 +172,15 @@ mvn test -Dgroups=e2eTest -Dtest='TransacaoE2ETest#comoMaquininhaDevoTerATransac
 O resultado aparece no terminal, e o detalhe de cada teste fica em `target/surefire-reports/`.
 
 **Pela IDE (VS Code / IntelliJ):** abra `CartaoE2ETest` ou `TransacaoE2ETest` (pacote
-`com.vr.miniautorizador.e2e`) e use o ▶ ao lado da classe ou do método. Com Podman, a IDE precisa
-enxergar as variáveis `DOCKER_HOST` e `TESTCONTAINERS_RYUK_DISABLED`. O jeito mais simples é
-exportá-las no terminal e abrir a IDE a partir dele (ex.: `code .`).
+`com.vr.miniautorizador.e2e`) e use o ▶ ao lado da classe ou do método. Para depurar, clique com
+o botão direito no ▶ e escolha **Debug Test**. Com Podman, a IDE precisa enxergar as variáveis
+`DOCKER_HOST` e `TESTCONTAINERS_RYUK_DISABLED`:
+
+- **VS Code:** o `.vscode/settings.json` do projeto já as define em `java.test.config`. O caminho
+  do socket usa o UID `1000`; se o seu for outro (`id -u`), ajuste-o ali. Recarregue a janela
+  (**Developer: Reload Window**) depois de alterar o arquivo.
+- **Outras IDEs:** exporte as variáveis no terminal e abra a IDE a partir dele, ou configure-as no
+  template de execução de testes JUnit.
 
 **Se aparecer `Skipped` ou `Tests run: 0`**, o Testcontainers não encontrou o Docker/Podman: os
 E2E foram pulados, e não executados. Confira se as variáveis acima foram exportadas no mesmo
@@ -443,9 +449,12 @@ UPDATE cartao
 Há ainda uma segunda camada de proteção: como a chave da mensagem Kafka é o número do cartão,
 transações de um mesmo cartão caem na mesma partição e são processadas sequencialmente.
 
-O cenário é coberto por `ConcorrenciaTransacaoTest`: **10 transações simultâneas de
-R$ 100,00** num cartão de R$ 500,00 → exatamente **5 aprovadas**, **5 recusadas** e saldo
-final **R$ 0,00**.
+O cenário é coberto em dois níveis, ambos com **10 transações simultâneas de R$ 100,00** num
+cartão de R$ 500,00 → exatamente **5 aprovadas**, **5 recusadas** e saldo final **R$ 0,00**:
+
+- `ConcorrenciaTransacaoTest`: roda sem Docker (H2 + Kafka embarcado);
+- `TransacaoE2ETest`: roda contra o **MySQL 5.7 real** (Testcontainers), validando o lock de
+  linha do InnoDB, do qual a garantia depende em produção.
 
 ## 9. Regras de autorização sem `if`
 
@@ -480,7 +489,7 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 | Sessão                 | Stateless (`SessionCreationPolicy.STATELESS`), sem cookies                                 |
 | CSRF                    | Desabilitado (API REST sem sessão/cookies)                                                  |
 | Endpoint público       | Apenas `GET /actuator/health`                                                               |
-| Senha do cartão        | Armazenada como hash**BCrypt**, comparada com `PasswordEncoder.matches`              |
+| Senha do cartão        | Armazenada como hash **BCrypt**, comparada com `PasswordEncoder.matches`             |
 | Desserialização Kafka | Restrita aos pacotes do projeto                                                              |
 
 É importante distinguir as duas senhas:
@@ -523,17 +532,16 @@ com os E2E rodando contra MySQL e Kafka reais): **70 passando, 0 falhas**.
 | **E2E (infraestrutura real)** | `CartaoE2ETest`, `TransacaoE2ETest`                                                                                             | Os fluxos completos contra **MySQL 5.7 e Kafka 3.7 reais** (Testcontainers), incluindo a concorrência no banco de produção                                                |
 | Arquitetura                         | `ArquiteturaLimpaTest`                                                                                                            | Regras de dependência entre camadas (ArchUnit)                                                                                                                                   |
 
-Os testes de integração e aceitação usam o perfil `test` (`application-test.yml`): **H2 em modo
-MySQL** e **`@EmbeddedKafka`**. Por isso rodam sem Docker.
-
-#### Qual banco cada teste usa
+### Qual banco cada teste usa
 
 Os testes de aceitação e de concorrência também percorrem o fluxo de ponta a ponta via HTTP, mas
 **não são os E2E**: rodam em H2. Os E2E são apenas as classes do pacote `e2e`, e **não usam H2**.
 
 | Testes | Perfil | Banco | Kafka | Precisa de Docker? |
 |---|---|---|---|---|
-| `MiniAutorizadorAcceptanceTest`, `ConcorrenciaTransacaoTest`, `RepositorioCartaoJpaAdapterTest` | `test` | H2 em memória (`application-test.yml`) | `@EmbeddedKafka` | Não |
+| `MiniAutorizadorAcceptanceTest`, `ConcorrenciaTransacaoTest` | `test` | H2 em memória (`application-test.yml`) | `@EmbeddedKafka` | Não |
+| `RepositorioCartaoJpaAdapterTest` (`@DataJpaTest`) | `test` | H2 em memória (`application-test.yml`) | não usa | Não |
+| Demais unitários e de controller | — | não usa (portas mockadas) | não usa | Não |
 | `CartaoE2ETest`, `TransacaoE2ETest` (`@E2ETest`) | `test-e2e` | **MySQL 5.7 em container** | Kafka 3.7 em container | Sim |
 
 No perfil `test-e2e`, o `application-test-e2e.yml` **não declara datasource**. A URL, o usuário e
