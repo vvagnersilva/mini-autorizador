@@ -1,0 +1,30 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "[markdown]": {
+        "editor.formatOnSave": false
+    },
+    "java.test.config": {
+        "name": "testcontainers-podman",
+        "env": {
+            "DOCKER_HOST": "unix:///run/user/1000/podman/podman.sock",
+            "TESTCONTAINERS_RYUK_DISABLED": "true"
+        }
+    },
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "miniautorizador",
+            "database": "miniautorizador",
+            "username": "root",
+            "password": ""
+        }
+    ]
+}
