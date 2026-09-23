@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 
 /**
  * Implementacao do caso de uso de criacao de cartao.
- * Todo cartao novo comeca com o saldo inicial configurado (padrao: R$ 500,00).
+ * Cada cartao novo comeca com o saldo inicial configurado (padrao: R$ 500,00).
  */
 @Service
 public class CriarCartaoService implements CriarCartaoUseCase {

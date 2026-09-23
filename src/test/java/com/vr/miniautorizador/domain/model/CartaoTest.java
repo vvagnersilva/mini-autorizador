@@ -44,8 +44,9 @@ class CartaoTest {
         Cartao a = new Cartao("123", "hash-1", new BigDecimal("500.00"));
         Cartao b = new Cartao("123", "hash-2", new BigDecimal("10.00"));
 
-        assertThat(a).isEqualTo(b);
-        assertThat(a.hashCode()).isEqualTo(b.hashCode());
+        assertThat(a)
+                .isEqualTo(b)
+                .hasSameHashCodeAs(b);
     }
 
     @Test

@@ -130,11 +130,11 @@ Para usá-la, no Postman clique em **Import** e selecione (ou arraste) o arquivo
 **vrBeneficios** aparece com três requisições, já apontando para `http://localhost:8080` e com a
 autenticação Basic (`username` / `password`) configurada:
 
-| Requisição | Método e endpoint | Corpo de exemplo |
-|---|---|---|
-| `criar_novo_cartao` | `POST /cartoes` | `numeroCartao`, `senha` |
-| `realizar_uma_transação` | `POST /transacoes` | `numeroCartao`, `senhaCartao`, `valor` |
-| `obter_saldo_cartão` | `GET /cartoes/{numeroCartao}` | — |
+| Requisição                 | Método e endpoint              | Corpo de exemplo                             |
+| ---------------------------- | ------------------------------- | -------------------------------------------- |
+| `criar_novo_cartao`        | `POST /cartoes`               | `numeroCartao`, `senha`                  |
+| `realizar_uma_transação` | `POST /transacoes`            | `numeroCartao`, `senhaCartao`, `valor` |
+| `obter_saldo_cartão`      | `GET /cartoes/{numeroCartao}` | —                                           |
 
 Com a aplicação no ar, envie as requisições nesta ordem: criar o cartão, consultar o saldo,
 realizar transações e consultar o saldo de novo. Use o mesmo `numeroCartao` em todas elas
@@ -201,6 +201,37 @@ o botão direito no ▶ e escolha **Debug Test**. Com Podman, a IDE precisa enxe
 E2E foram pulados, e não executados. Confira se as variáveis acima foram exportadas no mesmo
 terminal e se o socket existe (`ls /run/user/$(id -u)/podman/podman.sock`). Se não existir,
 ative-o com `systemctl --user enable --now podman.socket`.
+
+### Relatório do SonarQube
+
+Para gerar o relatório de qualidade do código (bugs, vulnerabilidades, *code smells*, duplicação e
+cobertura), rode na raiz do projeto:
+
+```bash
+./sonar.sh
+```
+
+O script faz tudo sozinho: sobe um SonarQube local em container (na primeira vez baixa a imagem,
+o que leva alguns minutos), configura o acesso, roda os testes e envia a análise. No final, ele
+mostra o endereço do relatório.
+
+**Acesse o relatório:**
+
+|          |                                                         |
+| -------- | ------------------------------------------------------- |
+| URL      | `http://localhost:9000/dashboard?id=mini-autorizador` |
+| Usuário | `admin`                                               |
+| Senha    | `Sonar@Local2026`                                     |
+
+Para atualizar o relatório depois de alterar o código, rode `./sonar.sh` de novo. Para liberar
+
+memória quando não estiver usando: `docker stop sonarqube` (os dados são mantidos; o próximo
+`./sonar.sh` inicia o container novamente).
+
+> O SonarQube roda em um container próprio, fora do `docker-compose.yml` do desafio. A
+> configuração do projeto (`sonar.projectKey`, caminho do relatório do JaCoCo e versão do
+> `sonar-maven-plugin`) fica no `pom.xml`. Se houver Docker/Podman acessível, os testes E2E
+> também rodam e entram na cobertura.
 
 ## 4. Arquitetura (Clean Architecture / Hexagonal)
 
@@ -504,7 +535,7 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 | Sessão                 | Stateless (`SessionCreationPolicy.STATELESS`), sem cookies                                 |
 | CSRF                    | Desabilitado (API REST sem sessão/cookies)                                                  |
 | Endpoint público       | Apenas `GET /actuator/health`                                                               |
-| Senha do cartão        | Armazenada como hash **BCrypt**, comparada com `PasswordEncoder.matches`             |
+| Senha do cartão        | Armazenada como hash **BCrypt**, comparada com `PasswordEncoder.matches`              |
 | Desserialização Kafka | Restrita aos pacotes do projeto                                                              |
 
 É importante distinguir as duas senhas:
@@ -528,20 +559,20 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 
 ## 12. Testes
 
-**70 testes** em 15 classes, todos executados com `mvn verify`. Última execução (Java 21.0.12,
-com os E2E rodando contra MySQL e Kafka reais): **70 passando, 0 falhas**.
+**72 testes** em 16 classes, todos executados com `mvn verify`. Última execução (Java 21.0.12,
+com os E2E rodando contra MySQL e Kafka reais): **72 passando, 0 falhas**.
 
 | Métrica (JaCoCo) | Cobertura |
 | ----------------- | --------- |
-| Linhas            | 96,0%     |
-| Instruções      | 95,7%     |
+| Linhas            | 98,0%     |
+| Instruções      | 97,2%     |
 | Branches          | 87,5%     |
 
 | Tipo                                | Classes                                                                                                                             | O que garantem                                                                                                                                                                    |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unitários de domínio              | `CartaoTest`, `SenhaCorretaRegraTest`, `SaldoSuficienteRegraTest`                                                             | Regras de negócio isoladas, incluindo limites (saldo exatamente igual ao valor)                                                                                                  |
 | Unitários de aplicação           | `CriarCartaoServiceTest`, `ConsultarSaldoServiceTest`, `ProcessarAutorizacaoServiceTest`                                      | Orquestração com portas mockadas: ordem das regras, débito só quando tudo passa, perda de corrida no `UPDATE`                                                                |
-| Adapters                            | `CartaoControllerTest`, `TransacaoControllerTest`, `RepositorioCartaoJpaAdapterTest`, `BCryptCodificadorDeSenhaAdapterTest` | Contratos HTTP (status e corpo), autenticação, mapeamento JPA e débito condicional real no banco                                                                               |
+| Adapters                            | `CartaoControllerTest`, `TransacaoControllerTest`, `RepositorioCartaoJpaAdapterTest`, `BCryptCodificadorDeSenhaAdapterTest`, `KafkaSolicitarAutorizacaoAdapterTest` | Contratos HTTP (status e corpo), autenticação, mapeamento JPA, débito condicional real no banco e falhas na espera da resposta do Kafka (timeout e interrupção)                                                                               |
 | Aceitação                         | `MiniAutorizadorAcceptanceTest`                                                                                                   | O roteiro da avaliação, de ponta a ponta com HTTP real + Kafka embarcado: criar, consultar, debitar até `SALDO_INSUFICIENTE`, senha inválida, cartão inexistente, 404 e 401 |
 | Concorrência                       | `ConcorrenciaTransacaoTest`                                                                                                       | 10 transações paralelas → 5 aprovadas, 5 recusadas, saldo zero                                                                                                                 |
 | **E2E (infraestrutura real)** | `CartaoE2ETest`, `TransacaoE2ETest`                                                                                             | Os fluxos completos contra **MySQL 5.7 e Kafka 3.7 reais** (Testcontainers), incluindo a concorrência no banco de produção                                                |
@@ -552,12 +583,12 @@ com os E2E rodando contra MySQL e Kafka reais): **70 passando, 0 falhas**.
 Os testes de aceitação e de concorrência também percorrem o fluxo de ponta a ponta via HTTP, mas
 **não são os E2E**: rodam em H2. Os E2E são apenas as classes do pacote `e2e`, e **não usam H2**.
 
-| Testes | Perfil | Banco | Kafka | Precisa de Docker? |
-|---|---|---|---|---|
-| `MiniAutorizadorAcceptanceTest`, `ConcorrenciaTransacaoTest` | `test` | H2 em memória (`application-test.yml`) | `@EmbeddedKafka` | Não |
-| `RepositorioCartaoJpaAdapterTest` (`@DataJpaTest`) | `test` | H2 em memória (`application-test.yml`) | não usa | Não |
-| Demais unitários e de controller | — | não usa (portas mockadas) | não usa | Não |
-| `CartaoE2ETest`, `TransacaoE2ETest` (`@E2ETest`) | `test-e2e` | **MySQL 5.7 em container** | Kafka 3.7 em container | Sim |
+| Testes                                                           | Perfil       | Banco                                     | Kafka                  | Precisa de Docker? |
+| ---------------------------------------------------------------- | ------------ | ----------------------------------------- | ---------------------- | ------------------ |
+| `MiniAutorizadorAcceptanceTest`, `ConcorrenciaTransacaoTest` | `test`     | H2 em memória (`application-test.yml`) | `@EmbeddedKafka`     | Não               |
+| `RepositorioCartaoJpaAdapterTest` (`@DataJpaTest`)           | `test`     | H2 em memória (`application-test.yml`) | não usa               | Não               |
+| Demais unitários e de controller                                | —           | não usa (portas mockadas)                | não usa               | Não               |
+| `CartaoE2ETest`, `TransacaoE2ETest` (`@E2ETest`)           | `test-e2e` | **MySQL 5.7 em container**          | Kafka 3.7 em container | Sim                |
 
 No perfil `test-e2e`, o `application-test-e2e.yml` **não declara datasource**. A URL, o usuário e
 a senha do banco são injetados em tempo de execução pelo `E2EContainersInitializer`, a partir do

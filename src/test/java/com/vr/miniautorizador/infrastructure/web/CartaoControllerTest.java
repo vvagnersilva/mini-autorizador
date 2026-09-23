@@ -20,7 +20,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -101,7 +100,7 @@ class CartaoControllerTest {
 
     @Test
     void deveRetornar404QuandoCartaoNaoExiste() throws Exception {
-        when(consultarSaldoUseCase.consultarSaldo(eq("nao-existe")))
+        when(consultarSaldoUseCase.consultarSaldo("nao-existe"))
                 .thenThrow(new CartaoNaoEncontradoException("nao-existe"));
 
         mockMvc.perform(get("/cartoes/nao-existe").with(httpBasic("username", "password")))

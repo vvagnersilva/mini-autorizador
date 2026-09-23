@@ -20,7 +20,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -73,7 +72,7 @@ class ConcorrenciaTransacaoTest {
         executor.shutdown();
         executor.awaitTermination(30, TimeUnit.SECONDS);
 
-        List<HttpStatusCode> resultados = futuros.stream().map(this::resultadoOuFalha).collect(Collectors.toList());
+        List<HttpStatusCode> resultados = futuros.stream().map(this::resultadoOuFalha).toList();
 
         long aprovadas = resultados.stream().filter(HttpStatus.CREATED::equals).count();
         long recusadas = resultados.stream().filter(HttpStatus.UNPROCESSABLE_ENTITY::equals).count();

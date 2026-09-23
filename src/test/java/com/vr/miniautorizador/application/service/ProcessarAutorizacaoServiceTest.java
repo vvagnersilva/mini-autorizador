@@ -16,7 +16,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -77,7 +76,7 @@ class ProcessarAutorizacaoServiceTest {
         ResultadoAutorizacao resultado = service.processar(solicitacao);
 
         assertThat(resultado).isEqualTo(ResultadoAutorizacao.APROVADA);
-        verify(repositorioCartao, times(1)).debitarSeSaldoSuficiente(eq("123"), eq(new BigDecimal("10.00")));
+        verify(repositorioCartao, times(1)).debitarSeSaldoSuficiente("123", new BigDecimal("10.00"));
     }
 
     @Test

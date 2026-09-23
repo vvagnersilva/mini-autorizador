@@ -37,7 +37,13 @@ public class SecurityConfig {
                         .build());
     }
 
+    /**
+     * CSRF desabilitado de proposito: a API e stateless (sem sessao e sem cookies) e cada
+     * requisicao se autentica via cabecalho HTTP Basic, que o navegador nao envia sozinho
+     * em uma requisicao forjada. Sem cookie de sessao, nao ha o que um ataque CSRF explorar.
+     */
     @Bean
+    @SuppressWarnings("java:S4502")
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())

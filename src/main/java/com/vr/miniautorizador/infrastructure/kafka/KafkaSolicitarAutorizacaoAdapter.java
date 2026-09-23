@@ -67,7 +67,11 @@ public class KafkaSolicitarAutorizacaoAdapter implements SolicitarAutorizacaoTra
     private ResultadoAutorizacao aguardarResposta(String correlationId, CompletableFuture<ResultadoAutorizacao> futuro) {
         try {
             return futuro.get(timeoutMs, TimeUnit.MILLISECONDS);
-        } catch (TimeoutException | InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
+            // Restaura o sinal de interrupcao para que quem chamou saiba que a thread foi interrompida.
+            Thread.currentThread().interrupt();
+            throw new AutorizacaoIndisponivelException(correlationId, e);
+        } catch (TimeoutException | ExecutionException e) {
             throw new AutorizacaoIndisponivelException(correlationId, e);
         } finally {
             respostasPendentes.remove(correlationId);

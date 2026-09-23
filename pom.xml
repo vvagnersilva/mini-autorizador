@@ -24,6 +24,13 @@
         <!-- Sobrescreve a versao gerenciada pelo Spring Boot: versoes < 1.21 nao falam
              com Docker Engine 25+ / Podman recentes (API minima 1.44). -->
         <testcontainers.version>1.21.4</testcontainers.version>
+
+        <!-- SonarQube (analise estatica + cobertura do JaCoCo). Ver README-IMPL, secao "Relatorio do SonarQube". -->
+        <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
+        <sonar.host.url>http://localhost:9000</sonar.host.url>
+        <sonar.projectKey>mini-autorizador</sonar.projectKey>
+        <sonar.projectName>mini-autorizador</sonar.projectName>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencies>
@@ -115,6 +122,15 @@
 
     <build>
         <finalName>mini-autorizador</finalName>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>${sonar-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

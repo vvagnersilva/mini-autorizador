@@ -77,20 +77,20 @@ class RepositorioCartaoJpaAdapterTest {
 
         int linhasAfetadas = repositorio.debitarSeSaldoSuficiente("444", new BigDecimal("100.00"));
 
-        assertThat(linhasAfetadas).isEqualTo(0);
+        assertThat(linhasAfetadas).isZero();
         assertThat(repositorio.buscarPorNumero("444").get().getSaldo()).isEqualByComparingTo("50.00");
     }
 
     @Test
     void naoDeveDebitarQuandoCartaoNaoExiste() {
-        assertThat(repositorio.debitarSeSaldoSuficiente("nao-existe", BigDecimal.TEN)).isEqualTo(0);
+        assertThat(repositorio.debitarSeSaldoSuficiente("nao-existe", BigDecimal.TEN)).isZero();
     }
 
     @Test
-    // @DataJpaTest envolve cada teste numa unica transacao com rollback automatico;
-    // aqui isso e indesejado, pois as threads concorrentes abrem suas PROPRIAS transacoes
-    // e nao enxergariam o cartao inserido pela thread principal caso a transacao dela
-    // ainda estivesse aberta (nao commitada). Desligamos esse wrapping so para este teste.
+    // O DataJpaTest envolve cada teste numa unica transacao com rollback automatico.
+    // Aqui isso e indesejado: as threads concorrentes abrem suas proprias transacoes e
+    // nao enxergariam o cartao inserido pela thread principal enquanto a transacao dela
+    // estivesse aberta, sem commit. Por isso esse comportamento e desligado so neste teste.
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void debitoConcorrenteNuncaDeveDeixarSaldoNegativo() throws InterruptedException {
         repositorio.salvar(new Cartao("555", "hash", new BigDecimal("500.00")));

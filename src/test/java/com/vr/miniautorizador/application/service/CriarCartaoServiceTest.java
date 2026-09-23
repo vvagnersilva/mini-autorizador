@@ -75,7 +75,9 @@ class CriarCartaoServiceTest {
         Cartao existente = new Cartao("6549873025634501", "hash-existente", new BigDecimal("500.00"));
         when(repositorioCartao.buscarPorNumero("6549873025634501")).thenReturn(Optional.of(existente));
 
-        assertThatThrownBy(() -> service.criar(new CriarCartaoComando("6549873025634501", "1234")))
+        CriarCartaoComando comando = new CriarCartaoComando("6549873025634501", "1234");
+
+        assertThatThrownBy(() -> service.criar(comando))
                 .isInstanceOf(CartaoJaExisteException.class);
 
         verify(repositorioCartao, never()).salvar(any());
@@ -86,7 +88,9 @@ class CriarCartaoServiceTest {
         when(repositorioCartao.buscarPorNumero("111")).thenReturn(Optional.of(
                 new Cartao("111", "hash-diferente-do-informado", BigDecimal.ZERO)));
 
-        assertThatThrownBy(() -> service.criar(new CriarCartaoComando("111", "senha-informada")))
+        CriarCartaoComando comando = new CriarCartaoComando("111", "senha-informada");
+
+        assertThatThrownBy(() -> service.criar(comando))
                 .isInstanceOf(CartaoJaExisteException.class)
                 .satisfies(ex -> {
                     CartaoJaExisteException cartaoJaExisteException = (CartaoJaExisteException) ex;

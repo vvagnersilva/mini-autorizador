@@ -19,8 +19,9 @@ class BCryptCodificadorDeSenhaAdapterTest {
     void deveCodificarSenhaGerandoHashDiferenteDoTextoOriginal() {
         String hash = adapter.codificar("1234");
 
-        assertThat(hash).isNotEqualTo("1234");
-        assertThat(hash).startsWith("$2a$");
+        assertThat(hash)
+                .isNotEqualTo("1234")
+                .startsWith("$2a$");
     }
 
     @Test

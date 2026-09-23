@@ -6,7 +6,11 @@ import java.util.Objects;
 /**
  * Agregado raiz do dominio. Representa um cartao de beneficio (VR/VA).
  * Objeto imutavel: qualquer alteracao de saldo produz uma nova instancia.
+ * <p>
+ * Nao e um {@code record} de proposito: a igualdade do agregado e por identidade (numero do
+ * cartao), e nao pelo valor de todos os campos, que e a semantica que um record comunica.
  */
+@SuppressWarnings("java:S6206")
 public final class Cartao {
 
     private final String numeroCartao;
