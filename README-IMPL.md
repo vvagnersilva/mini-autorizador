@@ -75,6 +75,17 @@ docker compose up -d
 mvn spring-boot:run
 ```
 
+Para encerrar a aplicação, pressione `Ctrl+C` no terminal onde ela está rodando. Se ela foi
+iniciada em segundo plano, ou se a subida falhar com `java.net.BindException: Endereço já em uso`
+(`Address already in use`) porque outra instância ainda ocupa a porta 8080:
+
+```bash
+ss -ltnp | grep 8080                # mostra qual processo está usando a porta
+pkill -f MiniAutorizadorApplication # encerra a instância em execução
+```
+
+Para parar também o MySQL e o Kafka, veja [Parando a aplicação e a infraestrutura](#parando-a-aplicação-e-a-infraestrutura).
+
 O banco `miniautorizador` e a tabela `cartao` são criados automaticamente
 (`createDatabaseIfNotExist=true` + `ddl-auto: update`). O tópico Kafka de solicitações também
 é criado automaticamente na subida.
@@ -110,22 +121,26 @@ docker compose down
 > O `docker-compose.yml` não declara volume para o MySQL. Por isso, o `down` descarta todos os
 > cartões criados: na próxima subida, o banco começa vazio. Use `stop`/`start` para preservá-los.
 
-### Exemplos de chamadas
+### Coleção do Postman
 
-```bash
-# Criar cartão
-curl -i -X POST http://localhost:8080/cartoes -u username:password \
-  -H "Content-Type: application/json" \
-  -d '{"numeroCartao": "6549873025634501", "senha": "1234"}'
+O projeto inclui uma coleção pronta para testar a aplicação manualmente:
+[`postman/vrBeneficios.postman_collection.json`](postman/vrBeneficios.postman_collection.json).
 
-# Consultar saldo
-curl -i http://localhost:8080/cartoes/6549873025634501 -u username:password
+Para usá-la, no Postman clique em **Import** e selecione (ou arraste) o arquivo. A coleção
+**vrBeneficios** aparece com três requisições, já apontando para `http://localhost:8080` e com a
+autenticação Basic (`username` / `password`) configurada:
 
-# Realizar transação
-curl -i -X POST http://localhost:8080/transacoes -u username:password \
-  -H "Content-Type: application/json" \
-  -d '{"numeroCartao": "6549873025634501", "senhaCartao": "1234", "valor": 10.00}'
-```
+| Requisição | Método e endpoint | Corpo de exemplo |
+|---|---|---|
+| `criar_novo_cartao` | `POST /cartoes` | `numeroCartao`, `senha` |
+| `realizar_uma_transação` | `POST /transacoes` | `numeroCartao`, `senhaCartao`, `valor` |
+| `obter_saldo_cartão` | `GET /cartoes/{numeroCartao}` | — |
+
+Com a aplicação no ar, envie as requisições nesta ordem: criar o cartão, consultar o saldo,
+realizar transações e consultar o saldo de novo. Use o mesmo `numeroCartao` em todas elas
+(no corpo das duas primeiras e na URL da consulta de saldo). Para ver as recusas do contrato,
+altere o corpo da transação: `senhaCartao` errada (`SENHA_INVALIDA`), número de cartão
+inexistente (`CARTAO_INEXISTENTE`) ou valor acima do saldo (`SALDO_INSUFICIENTE`).
 
 ### Testes
 
