@@ -85,6 +85,31 @@ Verificação de saúde (não exige autenticação):
 curl http://localhost:8080/actuator/health
 ```
 
+### Parando a aplicação e a infraestrutura
+
+**Aplicação:** pressione `Ctrl+C` no terminal onde o `mvn spring-boot:run` está rodando.
+Se ela foi iniciada em segundo plano (sem terminal associado):
+
+```bash
+pkill -f MiniAutorizadorApplication
+```
+
+**MySQL e Kafka:**
+
+```bash
+# pausa os containers, mantendo os dados (cartões e saldos)
+docker compose stop
+
+# retoma os containers pausados
+docker compose start
+
+# remove os containers - APAGA os dados do MySQL
+docker compose down
+```
+
+> O `docker-compose.yml` não declara volume para o MySQL. Por isso, o `down` descarta todos os
+> cartões criados: na próxima subida, o banco começa vazio. Use `stop`/`start` para preservá-los.
+
 ### Exemplos de chamadas
 
 ```bash
