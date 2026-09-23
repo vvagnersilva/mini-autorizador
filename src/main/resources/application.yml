@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: mini-autorizador
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/miniautorizador?createDatabaseIfNotExist=true&serverTimezone=UTC
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.vr.miniautorizador.*"
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  seguranca:
+    usuario: username
+    senha: password
+  cartao:
+    saldo-inicial: 500.00
+  kafka:
+    topico-solicitacao-autorizacao: mini-autorizador.autorizacao.solicitacoes
+    grupo-consumidor: mini-autorizador-autorizador
+    timeout-resposta-ms: 5000
+
+logging:
+  level:
+    com.vr.miniautorizador: INFO
