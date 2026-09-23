@@ -1,5 +1,23 @@
+# Build (Maven)
 target/
-.claude/
+
+# IDEs
+.idea/
+*.iml
 .vscode/
+.classpath
+.project
+.settings/
+
+# Ferramentas locais
+.claude/
+.github/modernize/
+
+# Arquivos temporários e de sistema
 .~lock*
+*.log
+*.swp
+.DS_Store
+
+# Consultas locais ao banco
 *.sql
