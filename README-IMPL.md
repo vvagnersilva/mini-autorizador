@@ -39,15 +39,15 @@ Todos os endpoints exigem autenticação HTTP Basic (`username` / `password`); s
 
 | Tecnologia                | Uso                                                                     |
 | ------------------------- | ----------------------------------------------------------------------- |
-| Java 21                   | Linguagem (records, pattern matching em`equals`)                      |
+| Java 21                   | Linguagem (records, pattern matching em `equals`)                      |
 | Spring Boot 3.3.4         | Framework principal (Web, Validation, Security, Data JPA, Actuator)     |
 | Maven                     | Build e gerenciamento de dependências                                  |
-| MySQL 5.7                 | Banco relacional (declarado no`docker-compose.yml` original)          |
+| MySQL 5.7                 | Banco relacional (declarado no `docker-compose.yml` original)          |
 | Apache Kafka 3.7 (KRaft)  | Processamento assíncrono das autorizações                            |
 | Spring Kafka              | Producer/consumer com serialização JSON                               |
 | BCrypt (Spring Security)  | Hash da senha do cartão                                                |
 | JUnit 5, Mockito, AssertJ | Testes unitários e de integração                                     |
-| H2 +`@EmbeddedKafka`    | Infraestrutura em memória para os testes de integração e aceitação |
+| H2 + `@EmbeddedKafka`   | Infraestrutura em memória para os testes de integração e aceitação |
 | Testcontainers 1.21       | MySQL 5.7 e Kafka 3.7 reais em containers para os testes E2E            |
 | ArchUnit                  | Verificação automática das regras de camadas                         |
 | JaCoCo                    | Cobertura de testes (mínimo exigido no build: 80% de linhas)           |
@@ -454,7 +454,7 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 | Autenticação da API   | HTTP Basic com um usuário técnico em memória (`username` / `password`, configurável) |
 | Sessão                 | Stateless (`SessionCreationPolicy.STATELESS`), sem cookies                                 |
 | CSRF                    | Desabilitado (API REST sem sessão/cookies)                                                  |
-| Endpoint público       | Apenas`GET /actuator/health`                                                               |
+| Endpoint público       | Apenas `GET /actuator/health`                                                               |
 | Senha do cartão        | Armazenada como hash**BCrypt**, comparada com `PasswordEncoder.matches`              |
 | Desserialização Kafka | Restrita aos pacotes do projeto                                                              |
 
@@ -491,11 +491,11 @@ com os E2E rodando contra MySQL e Kafka reais): **70 passando, 0 falhas**.
 | Tipo                                | Classes                                                                                                                             | O que garantem                                                                                                                                                                    |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unitários de domínio              | `CartaoTest`, `SenhaCorretaRegraTest`, `SaldoSuficienteRegraTest`                                                             | Regras de negócio isoladas, incluindo limites (saldo exatamente igual ao valor)                                                                                                  |
-| Unitários de aplicação           | `CriarCartaoServiceTest`, `ConsultarSaldoServiceTest`, `ProcessarAutorizacaoServiceTest`                                      | Orquestração com portas mockadas: ordem das regras, débito só quando tudo passa, perda de corrida no`UPDATE`                                                                |
+| Unitários de aplicação           | `CriarCartaoServiceTest`, `ConsultarSaldoServiceTest`, `ProcessarAutorizacaoServiceTest`                                      | Orquestração com portas mockadas: ordem das regras, débito só quando tudo passa, perda de corrida no `UPDATE`                                                                |
 | Adapters                            | `CartaoControllerTest`, `TransacaoControllerTest`, `RepositorioCartaoJpaAdapterTest`, `BCryptCodificadorDeSenhaAdapterTest` | Contratos HTTP (status e corpo), autenticação, mapeamento JPA e débito condicional real no banco                                                                               |
-| Aceitação                         | `MiniAutorizadorAcceptanceTest`                                                                                                   | O roteiro da avaliação, de ponta a ponta com HTTP real + Kafka embarcado: criar, consultar, debitar até`SALDO_INSUFICIENTE`, senha inválida, cartão inexistente, 404 e 401 |
+| Aceitação                         | `MiniAutorizadorAcceptanceTest`                                                                                                   | O roteiro da avaliação, de ponta a ponta com HTTP real + Kafka embarcado: criar, consultar, debitar até `SALDO_INSUFICIENTE`, senha inválida, cartão inexistente, 404 e 401 |
 | Concorrência                       | `ConcorrenciaTransacaoTest`                                                                                                       | 10 transações paralelas → 5 aprovadas, 5 recusadas, saldo zero                                                                                                                 |
-| **E2E (infraestrutura real)** | `CartaoE2ETest`, `TransacaoE2ETest`                                                                                             | Os fluxos completos contra**MySQL 5.7 e Kafka 3.7 reais** (Testcontainers), incluindo a concorrência no banco de produção                                                |
+| **E2E (infraestrutura real)** | `CartaoE2ETest`, `TransacaoE2ETest`                                                                                             | Os fluxos completos contra **MySQL 5.7 e Kafka 3.7 reais** (Testcontainers), incluindo a concorrência no banco de produção                                                |
 | Arquitetura                         | `ArquiteturaLimpaTest`                                                                                                            | Regras de dependência entre camadas (ArchUnit)                                                                                                                                   |
 
 Os testes de integração e aceitação usam o perfil `test` (`application-test.yml`): **H2 em modo
@@ -510,9 +510,9 @@ a mesma infraestrutura do `docker-compose.yml`.
 
 | Peça                        | Papel                                                                                                                                                                                          |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@E2ETest`                 | Meta-anotação: perfil`test-e2e`, contexto Spring completo, `MockMvc`, limpeza do banco, tag `e2eTest` e desativação automática sem Docker                                           |
-| `E2EContainersInitializer` | Sobe**uma vez por execução** os containers `mysql:5.7` e `apache/kafka:3.7.0`, compartilhados por todas as classes E2E, e injeta a URL do banco e os bootstrap servers no contexto |
-| `MySQLCleanUpExtension`    | Esvazia a tabela`cartao` antes de cada teste; cada cenário começa com o banco vazio                                                                                                        |
+| `@E2ETest`                 | Meta-anotação: perfil `test-e2e`, contexto Spring completo, `MockMvc`, limpeza do banco, tag `e2eTest` e desativação automática sem Docker                                           |
+| `E2EContainersInitializer` | Sobe **uma vez por execução** os containers `mysql:5.7` e `apache/kafka:3.7.0`, compartilhados por todas as classes E2E, e injeta a URL do banco e os bootstrap servers no contexto |
+| `MySQLCleanUpExtension`    | Esvazia a tabela `cartao` antes de cada teste; cada cenário começa com o banco vazio                                                                                                        |
 | `MockDsl`                  | DSL na linguagem do negócio (`dadoUmCartao`, `criarCartao`, `consultarSaldo`, `saldoDoCartao`, `realizarTransacao`), sempre autenticada com HTTP Basic real                         |
 | `application-test-e2e.yml` | Tópicos e consumer group próprios dos E2E e timeout de resposta de 10 s                                                                                                                      |
 
@@ -521,7 +521,7 @@ Cada teste verifica o resultado **pela API e direto no banco** (via `CartaoJpaRe
 | Classe                   | Cenários                                                                                                                                                                                                                                                             |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CartaoE2ETest` (6)    | Criação com saldo inicial de R$ 500,00 e senha gravada como hash BCrypt; cartão duplicado (`422`); consulta de saldo; cartão inexistente (`404`); corpo inválido (`400`); sem autenticação (`401`)                                                     |
-| `TransacaoE2ETest` (6) | Transação aprovada debitando o saldo; débitos até`SALDO_INSUFICIENTE`; `SENHA_INVALIDA` e valor inválido sem alterar o saldo; `CARTAO_INEXISTENTE`; **10 transações simultâneas → 5 aprovadas, 5 recusadas e saldo final R$ 0,00 no MySQL real** |
+| `TransacaoE2ETest` (6) | Transação aprovada debitando o saldo; débitos até `SALDO_INSUFICIENTE`; `SENHA_INVALIDA` e valor inválido sem alterar o saldo; `CARTAO_INEXISTENTE`; **10 transações simultâneas → 5 aprovadas, 5 recusadas e saldo final R$ 0,00 no MySQL real** |
 
 ## 13. Configuração
 
