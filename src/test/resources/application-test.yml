@@ -19,7 +19,7 @@ spring:
 
 app:
   seguranca:
-    usuario: user
+    usuario: username
     senha: password
   cartao:
     saldo-inicial: 500.00

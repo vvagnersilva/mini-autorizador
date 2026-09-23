@@ -33,7 +33,7 @@ Aplicação Spring Boot com interface REST que permite:
 | Consultar saldo | `GET /cartoes/{numeroCartao}` | `200` + saldo | `404` cartão inexistente |
 | Autorizar transação | `POST /transacoes` | `201` + `OK` | `422` + `SALDO_INSUFICIENTE` \| `SENHA_INVALIDA` \| `CARTAO_INEXISTENTE` |
 
-Todos os endpoints exigem autenticação HTTP Basic (`user` / `password`); sem ela a resposta é `401`.
+Todos os endpoints exigem autenticação HTTP Basic (`username` / `password`); sem ela a resposta é `401`.
 
 ## 2. Stack
 
@@ -83,15 +83,15 @@ curl http://localhost:8080/actuator/health
 
 ```bash
 # Criar cartão
-curl -i -X POST http://localhost:8080/cartoes -u user:password \
+curl -i -X POST http://localhost:8080/cartoes -u username:password \
   -H "Content-Type: application/json" \
   -d '{"numeroCartao": "6549873025634501", "senha": "1234"}'
 
 # Consultar saldo
-curl -i http://localhost:8080/cartoes/6549873025634501 -u user:password
+curl -i http://localhost:8080/cartoes/6549873025634501 -u username:password
 
 # Realizar transação
-curl -i -X POST http://localhost:8080/transacoes -u user:password \
+curl -i -X POST http://localhost:8080/transacoes -u username:password \
   -H "Content-Type: application/json" \
   -d '{"numeroCartao": "6549873025634501", "senhaCartao": "1234", "valor": 10.00}'
 ```
@@ -400,7 +400,7 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 
 | Aspecto | Implementação |
 |---|---|
-| Autenticação da API | HTTP Basic com um usuário técnico em memória (`user` / `password`, configurável) |
+| Autenticação da API | HTTP Basic com um usuário técnico em memória (`username` / `password`, configurável) |
 | Sessão | Stateless (`SessionCreationPolicy.STATELESS`), sem cookies |
 | CSRF | Desabilitado (API REST sem sessão/cookies) |
 | Endpoint público | Apenas `GET /actuator/health` |
@@ -409,7 +409,7 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 
 É importante distinguir as duas senhas:
 
-- **Login da API** (`user`/`password`, cabeçalho `Authorization`): se estiver errado, a
+- **Login da API** (`username`/`password`, cabeçalho `Authorization`): se estiver errado, a
   requisição é barrada antes de chegar ao controller → `401`.
 - **Senha do cartão** (`senhaCartao` no corpo): validada pela regra de negócio → `422 SENHA_INVALIDA`.
 
@@ -456,7 +456,7 @@ Principais propriedades de `src/main/resources/application.yml`:
 |---|---|---|
 | `spring.datasource.url` | `jdbc:mysql://localhost:3306/miniautorizador` | Conexão com o MySQL |
 | `spring.kafka.bootstrap-servers` | `localhost:9092` | Broker Kafka |
-| `app.seguranca.usuario` / `senha` | `user` / `password` | Credenciais do Basic Auth |
+| `app.seguranca.usuario` / `senha` | `username` / `password` | Credenciais do Basic Auth |
 | `app.cartao.saldo-inicial` | `500.00` | Saldo de todo cartão novo |
 | `app.kafka.topico-solicitacao-autorizacao` | `mini-autorizador.autorizacao.solicitacoes` | Tópico de solicitações |
 | `app.kafka.grupo-consumidor` | `mini-autorizador-autorizador` | Consumer group do processador |
@@ -480,7 +480,6 @@ Qualquer propriedade pode ser sobrescrita por variável de ambiente (ex.: `APP_C
   original, para não confundir indisponibilidade com recusa de negócio.
 - **Transações não são persistidas**, conforme o enunciado; apenas o saldo é atualizado.
 - **Valores monetários** usam `BigDecimal` / `DECIMAL(15,2)`, nunca `double`.
-- **Usuário da API** é único e em memória; em produção viria de um provedor de identidade.
-  As credenciais seguem o usuário definido em `scripts/init.users` (`user` / `password`), e não
-  o `username` / `password` citado nos contratos do README. Podem ser alteradas em
-  `app.seguranca.usuario` / `app.seguranca.senha`.
+- **Usuário da API** é único e em memória (`username` / `password`, conforme o contrato),
+  configurável em `app.seguranca.usuario` / `app.seguranca.senha`; em produção viria de um
+  provedor de identidade.

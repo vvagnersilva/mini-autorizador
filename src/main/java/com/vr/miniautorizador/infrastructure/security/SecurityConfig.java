@@ -15,7 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * Seguranca da API: autenticacao HTTP Basic com um unico usuario tecnico
- * (login = user, senha = password - ver scripts/init.users), sem sessao (API stateless).
+ * (contrato: login = username, senha = password), sem sessao (API stateless).
  */
 @Configuration
 @EnableWebSecurity
