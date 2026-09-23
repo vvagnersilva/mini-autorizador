@@ -47,7 +47,7 @@ Todos os endpoints exigem autenticação HTTP Basic (`username` / `password`); s
 | Spring Kafka              | Producer/consumer com serialização JSON                               |
 | BCrypt (Spring Security)  | Hash da senha do cartão                                                |
 | JUnit 5, Mockito, AssertJ | Testes unitários e de integração                                     |
-| H2 + `@EmbeddedKafka`   | Infraestrutura em memória para os testes de integração e aceitação |
+| H2 + `@EmbeddedKafka`    | Infraestrutura em memória para os testes de integração e aceitação |
 | Testcontainers 1.21       | MySQL 5.7 e Kafka 3.7 reais em containers para os testes E2E            |
 | ArchUnit                  | Verificação automática das regras de camadas                         |
 | JaCoCo                    | Cobertura de testes (mínimo exigido no build: 80% de linhas)           |
@@ -186,22 +186,6 @@ mvn test -Dgroups=e2eTest -Dtest='TransacaoE2ETest#comoMaquininhaDevoTerATransac
 
 O resultado aparece no terminal, e o detalhe de cada teste fica em `target/surefire-reports/`.
 
-**Pela IDE (VS Code / IntelliJ):** abra `CartaoE2ETest` ou `TransacaoE2ETest` (pacote
-`com.vr.miniautorizador.e2e`) e use o ▶ ao lado da classe ou do método. Para depurar, clique com
-o botão direito no ▶ e escolha **Debug Test**. Com Podman, a IDE precisa enxergar as variáveis
-`DOCKER_HOST` e `TESTCONTAINERS_RYUK_DISABLED`:
-
-- **VS Code:** o `.vscode/settings.json` do projeto já as define em `java.test.config`. O caminho
-  do socket usa o UID `1000`; se o seu for outro (`id -u`), ajuste-o ali. Recarregue a janela
-  (**Developer: Reload Window**) depois de alterar o arquivo.
-- **Outras IDEs:** exporte as variáveis no terminal e abra a IDE a partir dele, ou configure-as no
-  template de execução de testes JUnit.
-
-**Se aparecer `Skipped` ou `Tests run: 0`**, o Testcontainers não encontrou o Docker/Podman: os
-E2E foram pulados, e não executados. Confira se as variáveis acima foram exportadas no mesmo
-terminal e se o socket existe (`ls /run/user/$(id -u)/podman/podman.sock`). Se não existir,
-ative-o com `systemctl --user enable --now podman.socket`.
-
 ### Relatório do SonarQube
 
 Para gerar o relatório de qualidade do código (bugs, vulnerabilidades, *code smells*, duplicação e
@@ -238,29 +222,9 @@ memória quando não estiver usando: `docker stop sonarqube` (os dados são mant
 O código é organizado em três camadas concêntricas. A regra de dependência é sempre de fora
 para dentro: a infraestrutura conhece a aplicação e o domínio; o domínio não conhece ninguém.
 
-```mermaid
-flowchart TB
-    subgraph INFRA["infrastructure (adapters)"]
-        WEB["web<br/>Controllers, DTOs,<br/>GlobalExceptionHandler"]
-        KAFKA["kafka<br/>Producer, Listener,<br/>Mensagens, Tópicos"]
-        PERS["persistence<br/>Entidade JPA,<br/>Repositório, Adapter"]
-        SEC["security<br/>Basic Auth,<br/>Adapter BCrypt"]
-    end
-    subgraph APP["application (casos de uso)"]
-        PORTIN["port.in<br/>Interfaces de casos de uso"]
-        SVC["service<br/>Implementações"]
-        CFG["config<br/>Composição das regras"]
-    end
-    subgraph DOM["domain (núcleo)"]
-        MODEL["model<br/>Cartao, SolicitacaoTransacao,<br/>ResultadoAutorizacao"]
-        REGRA["regra<br/>RegraAutorizacao (Strategy)"]
-        PORT["port<br/>RepositorioCartao,<br/>CodificadorDeSenha"]
-        EXC["exception"]
-    end
-    INFRA --> APP
-    INFRA --> DOM
-    APP --> DOM
-```
+<p align="center">
+  <img src="docs/arquitetura.svg" alt="Camadas concêntricas: infrastructure por fora, application no meio e domain no centro; as dependências apontam para dentro" width="760">
+</p>
 
 ### Estrutura de pacotes
 
@@ -568,15 +532,15 @@ com os E2E rodando contra MySQL e Kafka reais): **72 passando, 0 falhas**.
 | Instruções      | 97,2%     |
 | Branches          | 87,5%     |
 
-| Tipo                                | Classes                                                                                                                             | O que garantem                                                                                                                                                                    |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unitários de domínio              | `CartaoTest`, `SenhaCorretaRegraTest`, `SaldoSuficienteRegraTest`                                                             | Regras de negócio isoladas, incluindo limites (saldo exatamente igual ao valor)                                                                                                  |
-| Unitários de aplicação           | `CriarCartaoServiceTest`, `ConsultarSaldoServiceTest`, `ProcessarAutorizacaoServiceTest`                                      | Orquestração com portas mockadas: ordem das regras, débito só quando tudo passa, perda de corrida no `UPDATE`                                                                |
-| Adapters                            | `CartaoControllerTest`, `TransacaoControllerTest`, `RepositorioCartaoJpaAdapterTest`, `BCryptCodificadorDeSenhaAdapterTest`, `KafkaSolicitarAutorizacaoAdapterTest` | Contratos HTTP (status e corpo), autenticação, mapeamento JPA, débito condicional real no banco e falhas na espera da resposta do Kafka (timeout e interrupção)                                                                               |
-| Aceitação                         | `MiniAutorizadorAcceptanceTest`                                                                                                   | O roteiro da avaliação, de ponta a ponta com HTTP real + Kafka embarcado: criar, consultar, debitar até `SALDO_INSUFICIENTE`, senha inválida, cartão inexistente, 404 e 401 |
-| Concorrência                       | `ConcorrenciaTransacaoTest`                                                                                                       | 10 transações paralelas → 5 aprovadas, 5 recusadas, saldo zero                                                                                                                 |
-| **E2E (infraestrutura real)** | `CartaoE2ETest`, `TransacaoE2ETest`                                                                                             | Os fluxos completos contra **MySQL 5.7 e Kafka 3.7 reais** (Testcontainers), incluindo a concorrência no banco de produção                                                |
-| Arquitetura                         | `ArquiteturaLimpaTest`                                                                                                            | Regras de dependência entre camadas (ArchUnit)                                                                                                                                   |
+| Tipo                                | Classes                                                                                                                                                                       | O que garantem                                                                                                                                                                    |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unitários de domínio              | `CartaoTest`, `SenhaCorretaRegraTest`, `SaldoSuficienteRegraTest`                                                                                                       | Regras de negócio isoladas, incluindo limites (saldo exatamente igual ao valor)                                                                                                  |
+| Unitários de aplicação           | `CriarCartaoServiceTest`, `ConsultarSaldoServiceTest`, `ProcessarAutorizacaoServiceTest`                                                                                | Orquestração com portas mockadas: ordem das regras, débito só quando tudo passa, perda de corrida no `UPDATE`                                                                |
+| Adapters                            | `CartaoControllerTest`, `TransacaoControllerTest`, `RepositorioCartaoJpaAdapterTest`, `BCryptCodificadorDeSenhaAdapterTest`, `KafkaSolicitarAutorizacaoAdapterTest` | Contratos HTTP (status e corpo), autenticação, mapeamento JPA, débito condicional real no banco e falhas na espera da resposta do Kafka (timeout e interrupção)              |
+| Aceitação                         | `MiniAutorizadorAcceptanceTest`                                                                                                                                             | O roteiro da avaliação, de ponta a ponta com HTTP real + Kafka embarcado: criar, consultar, debitar até `SALDO_INSUFICIENTE`, senha inválida, cartão inexistente, 404 e 401 |
+| Concorrência                       | `ConcorrenciaTransacaoTest`                                                                                                                                                 | 10 transações paralelas → 5 aprovadas, 5 recusadas, saldo zero                                                                                                                 |
+| **E2E (infraestrutura real)** | `CartaoE2ETest`, `TransacaoE2ETest`                                                                                                                                       | Os fluxos completos contra **MySQL 5.7 e Kafka 3.7 reais** (Testcontainers), incluindo a concorrência no banco de produção                                                |
+| Arquitetura                         | `ArquiteturaLimpaTest`                                                                                                                                                      | Regras de dependência entre camadas (ArchUnit)                                                                                                                                   |
 
 ### Qual banco cada teste usa
 
