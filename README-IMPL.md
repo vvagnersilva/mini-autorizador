@@ -316,47 +316,6 @@ A separação não depende de disciplina: `ArquiteturaLimpaTest` (ArchUnit) queb
 `ConsultarSaldoService` busca o cartão e devolve o saldo, ou lança
 `CartaoNaoEncontradoException` → `404`.
 
-### Autorização de transação (via Kafka)
-
-A requisição HTTP é síncrona para o cliente, mas o processamento da regra de negócio é
-assíncrono, desacoplado por Kafka:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Cliente (maquininha)
-    participant TC as TransacaoController
-    participant KA as KafkaSolicitarAutorizacaoAdapter
-    participant K as Kafka
-    participant L as AutorizacaoKafkaListener
-    participant S as ProcessarAutorizacaoService
-    participant DB as MySQL
-
-    C->>TC: POST /transacoes
-    TC->>KA: autorizar(solicitacao)
-    KA->>KA: gera correlationId e registra CompletableFuture
-    KA->>K: publica em "solicitacoes" (key = numeroCartao)
-    K->>L: entrega a mensagem (consumer group)
-    L->>S: processar(solicitacao)
-    S->>DB: SELECT cartão
-    S->>S: aplica regras (senha, saldo)
-    S->>DB: UPDATE saldo = saldo - valor WHERE saldo >= valor
-    S-->>L: ResultadoAutorizacao
-    L->>K: publica em "resultado.<uuid da instância>"
-    K->>KA: entrega o resultado
-    KA->>KA: completa o Future do correlationId
-    KA-->>TC: ResultadoAutorizacao
-    TC-->>C: 201 OK ou 422 MOTIVO
-```
-
-Ordem de avaliação das regras (a primeira recusa encerra a avaliação):
-
-1. **Cartão existe?** senão `CARTAO_INEXISTENTE`
-2. **Senha correta?** senão `SENHA_INVALIDA`
-3. **Saldo suficiente?** senão `SALDO_INSUFICIENTE`
-4. **Débito atômico** no banco; se o `UPDATE` não afetar nenhuma linha (outra transação
-   consumiu o saldo no meio do caminho) → `SALDO_INSUFICIENTE`; senão `APROVADA`.
-
 ## 6. Kafka
 
 O `docker-compose.yml` original não trazia Kafka; ele foi **adicionado** para processar as
