@@ -128,7 +128,7 @@ mvn test -Dgroups=e2eTest          # só os E2E
 mvn test -DexcludedGroups=e2eTest  # tudo menos os E2E
 ```
 
-#### Rodando os testes E2E
+#### Rodando os testes E2E (Testcontainers)
 
 Os E2E sobem seus próprios containers (`mysql:5.7` e `apache/kafka:3.7.0`) em portas aleatórias.
 Por isso **não é preciso** subir o `docker-compose` nem a aplicação antes, e eles não conflitam
