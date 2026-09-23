@@ -526,6 +526,20 @@ com os E2E rodando contra MySQL e Kafka reais): **70 passando, 0 falhas**.
 Os testes de integração e aceitação usam o perfil `test` (`application-test.yml`): **H2 em modo
 MySQL** e **`@EmbeddedKafka`**. Por isso rodam sem Docker.
 
+#### Qual banco cada teste usa
+
+Os testes de aceitação e de concorrência também percorrem o fluxo de ponta a ponta via HTTP, mas
+**não são os E2E**: rodam em H2. Os E2E são apenas as classes do pacote `e2e`, e **não usam H2**.
+
+| Testes | Perfil | Banco | Kafka | Precisa de Docker? |
+|---|---|---|---|---|
+| `MiniAutorizadorAcceptanceTest`, `ConcorrenciaTransacaoTest`, `RepositorioCartaoJpaAdapterTest` | `test` | H2 em memória (`application-test.yml`) | `@EmbeddedKafka` | Não |
+| `CartaoE2ETest`, `TransacaoE2ETest` (`@E2ETest`) | `test-e2e` | **MySQL 5.7 em container** | Kafka 3.7 em container | Sim |
+
+No perfil `test-e2e`, o `application-test-e2e.yml` **não declara datasource**. A URL, o usuário e
+a senha do banco são injetados em tempo de execução pelo `E2EContainersInitializer`, a partir do
+container MySQL que o Testcontainers sobe numa porta aleatória.
+
 ### Testes E2E
 
 Os testes de aceitação acima validam o fluxo, mas em H2. O comportamento que mais importa, o
