@@ -1,0 +1,30 @@
+# Perfil dos testes E2E (@E2ETest).
+# Datasource e bootstrap-servers NAO ficam aqui: sao injetados em tempo de execucao
+# pelo E2EContainersInitializer, a partir dos containers MySQL e Kafka do Testcontainers.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  kafka:
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.vr.miniautorizador.*"
+
+app:
+  seguranca:
+    usuario: username
+    senha: password
+  cartao:
+    saldo-inicial: 500.00
+  kafka:
+    topico-solicitacao-autorizacao: mini-autorizador.autorizacao.solicitacoes.e2e
+    grupo-consumidor: mini-autorizador-autorizador-e2e
+    timeout-resposta-ms: 10000
+
+logging:
+  level:
+    ROOT: warn
+    com.vr.miniautorizador: info

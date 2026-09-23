@@ -47,7 +47,8 @@ Todos os endpoints exigem autenticação HTTP Basic (`username` / `password`); s
 | Spring Kafka | Producer/consumer com serialização JSON |
 | BCrypt (Spring Security) | Hash da senha do cartão |
 | JUnit 5, Mockito, AssertJ | Testes unitários e de integração |
-| H2 + `@EmbeddedKafka` | Infraestrutura em memória para os testes |
+| H2 + `@EmbeddedKafka` | Infraestrutura em memória para os testes de integração e aceitação |
+| Testcontainers 1.21 | MySQL 5.7 e Kafka 3.7 reais em containers para os testes E2E |
 | ArchUnit | Verificação automática das regras de camadas |
 | JaCoCo | Cobertura de testes (mínimo exigido no build: 80% de linhas) |
 
@@ -55,9 +56,14 @@ Todos os endpoints exigem autenticação HTTP Basic (`username` / `password`); s
 
 ### Pré-requisitos
 
-- JDK 21+
+- **JDK 21** (o `pom.xml` compila com `release 21`)
 - Maven 3.9+
 - Docker (ou Podman) com Compose
+
+> **Ambiente validado:** OpenJDK **21.0.12** + Maven 3.9.12 + Podman, no Ubuntu.
+> É preciso ter o **JDK** instalado (ex.: `openjdk-21-jdk`), e não apenas o JRE: com um JRE
+> mais novo como `java` padrão (ex.: JRE 25, sem compilador), o build falha com
+> `release version 21 not supported`. Nesse caso, aponte o `JAVA_HOME` para o JDK 21.
 
 ### Subindo a infraestrutura e a aplicação
 
@@ -102,10 +108,25 @@ curl -i -X POST http://localhost:8080/transacoes -u username:password \
 mvn verify
 ```
 
-Executa todos os testes (unitários, integração, aceitação, concorrência e arquitetura), gera o
+Executa todos os testes (unitários, integração, aceitação, concorrência, arquitetura e E2E), gera o
 relatório de cobertura em `target/site/jacoco/index.html` e falha o build se a cobertura de
-linhas ficar abaixo de 80%. Os testes **não** dependem do docker-compose: usam H2 e Kafka
-embarcado.
+linhas ficar abaixo de 80%. Nenhum teste depende do docker-compose: os de integração usam H2 e
+Kafka embarcado, e os E2E sobem seus próprios containers via Testcontainers.
+
+Os testes E2E precisam de Docker ou Podman acessível. **Sem ele, são pulados (não falham)**, e o
+restante da suíte roda normalmente. Com Podman, exporte o socket antes de rodar:
+
+```bash
+export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
+export TESTCONTAINERS_RYUK_DISABLED=true
+```
+
+Para rodar apenas uma parte da suíte (filtro pela tag `e2eTest`):
+
+```bash
+mvn test -Dgroups=e2eTest          # só os E2E
+mvn test -DexcludedGroups=e2eTest  # tudo menos os E2E
+```
 
 ## 4. Arquitetura (Clean Architecture / Hexagonal)
 
@@ -428,11 +449,12 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 
 ## 12. Testes
 
-**58 testes** em 13 classes, todos executados com `mvn verify`. Última execução:
+**70 testes** em 15 classes, todos executados com `mvn verify`. Última execução (Java 21.0.12,
+com os E2E rodando contra MySQL e Kafka reais): **70 passando, 0 falhas**.
 
 | Métrica (JaCoCo) | Cobertura |
 |---|---|
-| Linhas | 96,1% |
+| Linhas | 96,0% |
 | Instruções | 95,7% |
 | Branches | 87,5% |
 
@@ -441,12 +463,35 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 | Unitários de domínio | `CartaoTest`, `SenhaCorretaRegraTest`, `SaldoSuficienteRegraTest` | Regras de negócio isoladas, incluindo limites (saldo exatamente igual ao valor) |
 | Unitários de aplicação | `CriarCartaoServiceTest`, `ConsultarSaldoServiceTest`, `ProcessarAutorizacaoServiceTest` | Orquestração com portas mockadas: ordem das regras, débito só quando tudo passa, perda de corrida no `UPDATE` |
 | Adapters | `CartaoControllerTest`, `TransacaoControllerTest`, `RepositorioCartaoJpaAdapterTest`, `BCryptCodificadorDeSenhaAdapterTest` | Contratos HTTP (status e corpo), autenticação, mapeamento JPA e débito condicional real no banco |
-| Aceitação (E2E) | `MiniAutorizadorAcceptanceTest` | O roteiro da avaliação, de ponta a ponta com HTTP real + Kafka embarcado: criar, consultar, debitar até `SALDO_INSUFICIENTE`, senha inválida, cartão inexistente, 404 e 401 |
+| Aceitação | `MiniAutorizadorAcceptanceTest` | O roteiro da avaliação, de ponta a ponta com HTTP real + Kafka embarcado: criar, consultar, debitar até `SALDO_INSUFICIENTE`, senha inválida, cartão inexistente, 404 e 401 |
 | Concorrência | `ConcorrenciaTransacaoTest` | 10 transações paralelas → 5 aprovadas, 5 recusadas, saldo zero |
+| **E2E (infraestrutura real)** | `CartaoE2ETest`, `TransacaoE2ETest` | Os fluxos completos contra **MySQL 5.7 e Kafka 3.7 reais** (Testcontainers), incluindo a concorrência no banco de produção |
 | Arquitetura | `ArquiteturaLimpaTest` | Regras de dependência entre camadas (ArchUnit) |
 
-Os testes de integração usam o perfil `test` (`application-test.yml`): **H2 em modo MySQL** e
-**`@EmbeddedKafka`**. Por isso rodam sem Docker.
+Os testes de integração e aceitação usam o perfil `test` (`application-test.yml`): **H2 em modo
+MySQL** e **`@EmbeddedKafka`**. Por isso rodam sem Docker.
+
+### Testes E2E
+
+Os testes de aceitação acima validam o fluxo, mas em H2. O comportamento que mais importa, o
+débito atômico sob concorrência (seção 8), depende do InnoDB do MySQL. Os testes E2E cobrem essa
+lacuna: exercitam **HTTP → segurança → caso de uso → Kafka → regras → MySQL → Kafka → HTTP** com
+a mesma infraestrutura do `docker-compose.yml`.
+
+| Peça | Papel |
+|---|---|
+| `@E2ETest` | Meta-anotação: perfil `test-e2e`, contexto Spring completo, `MockMvc`, limpeza do banco, tag `e2eTest` e desativação automática sem Docker |
+| `E2EContainersInitializer` | Sobe **uma vez por execução** os containers `mysql:5.7` e `apache/kafka:3.7.0`, compartilhados por todas as classes E2E, e injeta a URL do banco e os bootstrap servers no contexto |
+| `MySQLCleanUpExtension` | Esvazia a tabela `cartao` antes de cada teste; cada cenário começa com o banco vazio |
+| `MockDsl` | DSL na linguagem do negócio (`dadoUmCartao`, `criarCartao`, `consultarSaldo`, `saldoDoCartao`, `realizarTransacao`), sempre autenticada com HTTP Basic real |
+| `application-test-e2e.yml` | Tópicos e consumer group próprios dos E2E e timeout de resposta de 10 s |
+
+Cada teste verifica o resultado **pela API e direto no banco** (via `CartaoJpaRepository`):
+
+| Classe | Cenários |
+|---|---|
+| `CartaoE2ETest` (6) | Criação com saldo inicial de R$ 500,00 e senha gravada como hash BCrypt; cartão duplicado (`422`); consulta de saldo; cartão inexistente (`404`); corpo inválido (`400`); sem autenticação (`401`) |
+| `TransacaoE2ETest` (6) | Transação aprovada debitando o saldo; débitos até `SALDO_INSUFICIENTE`; `SENHA_INVALIDA` e valor inválido sem alterar o saldo; `CARTAO_INEXISTENTE`; **10 transações simultâneas → 5 aprovadas, 5 recusadas e saldo final R$ 0,00 no MySQL real** |
 
 ## 13. Configuração
 
