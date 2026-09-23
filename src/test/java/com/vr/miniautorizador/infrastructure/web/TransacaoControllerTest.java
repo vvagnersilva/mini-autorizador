@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(TransacaoController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
-@TestPropertySource(properties = {"app.seguranca.usuario=username", "app.seguranca.senha=password"})
+@TestPropertySource(properties = {"app.seguranca.usuario=user", "app.seguranca.senha=password"})
 class TransacaoControllerTest {
 
     @Autowired
@@ -42,7 +42,7 @@ class TransacaoControllerTest {
         when(solicitarAutorizacaoTransacaoUseCase.autorizar(any())).thenReturn(ResultadoAutorizacao.APROVADA);
 
         mockMvc.perform(post("/transacoes")
-                        .with(httpBasic("username", "password"))
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new TransacaoRequest("6549873025634501", "1234", new BigDecimal("10.00")))))
@@ -55,7 +55,7 @@ class TransacaoControllerTest {
         when(solicitarAutorizacaoTransacaoUseCase.autorizar(any())).thenReturn(ResultadoAutorizacao.SALDO_INSUFICIENTE);
 
         mockMvc.perform(post("/transacoes")
-                        .with(httpBasic("username", "password"))
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new TransacaoRequest("6549873025634501", "1234", new BigDecimal("10000.00")))))
@@ -68,7 +68,7 @@ class TransacaoControllerTest {
         when(solicitarAutorizacaoTransacaoUseCase.autorizar(any())).thenReturn(ResultadoAutorizacao.SENHA_INVALIDA);
 
         mockMvc.perform(post("/transacoes")
-                        .with(httpBasic("username", "password"))
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new TransacaoRequest("6549873025634501", "0000", new BigDecimal("10.00")))))
@@ -81,7 +81,7 @@ class TransacaoControllerTest {
         when(solicitarAutorizacaoTransacaoUseCase.autorizar(any())).thenReturn(ResultadoAutorizacao.CARTAO_INEXISTENTE);
 
         mockMvc.perform(post("/transacoes")
-                        .with(httpBasic("username", "password"))
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new TransacaoRequest("0000000000000000", "1234", new BigDecimal("10.00")))))
@@ -101,7 +101,7 @@ class TransacaoControllerTest {
     @Test
     void deveRetornar400QuandoValorForNegativo() throws Exception {
         mockMvc.perform(post("/transacoes")
-                        .with(httpBasic("username", "password"))
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new TransacaoRequest("123", "1234", new BigDecimal("-10.00")))))

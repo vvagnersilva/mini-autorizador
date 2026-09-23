@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(CartaoController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
-@TestPropertySource(properties = {"app.seguranca.usuario=username", "app.seguranca.senha=password"})
+@TestPropertySource(properties = {"app.seguranca.usuario=user", "app.seguranca.senha=password"})
 class CartaoControllerTest {
 
     @Autowired
@@ -54,7 +54,7 @@ class CartaoControllerTest {
         when(criarCartaoUseCase.criar(any())).thenReturn(new CartaoCriado("6549873025634501", "1234"));
 
         mockMvc.perform(post("/cartoes")
-                        .with(httpBasic("username", "password"))
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CriarCartaoRequest("6549873025634501", "1234"))))
                 .andExpect(status().isCreated())
@@ -66,7 +66,7 @@ class CartaoControllerTest {
         when(criarCartaoUseCase.criar(any())).thenThrow(new CartaoJaExisteException("6549873025634501", "1234"));
 
         mockMvc.perform(post("/cartoes")
-                        .with(httpBasic("username", "password"))
+                        .with(httpBasic("user", "password"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CriarCartaoRequest("6549873025634501", "1234"))))
                 .andExpect(status().isUnprocessableEntity())
@@ -84,7 +84,7 @@ class CartaoControllerTest {
     @Test
     void deveRetornar401QuandoCredenciaisInvalidas() throws Exception {
         mockMvc.perform(post("/cartoes")
-                        .with(httpBasic("username", "senha-errada"))
+                        .with(httpBasic("user", "senha-errada"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CriarCartaoRequest("123", "1234"))))
                 .andExpect(status().isUnauthorized());
@@ -94,7 +94,7 @@ class CartaoControllerTest {
     void deveRetornar200ComSaldoDoCartao() throws Exception {
         when(consultarSaldoUseCase.consultarSaldo("6549873025634501")).thenReturn(new BigDecimal("495.15"));
 
-        mockMvc.perform(get("/cartoes/6549873025634501").with(httpBasic("username", "password")))
+        mockMvc.perform(get("/cartoes/6549873025634501").with(httpBasic("user", "password")))
                 .andExpect(status().isOk())
                 .andExpect(content().string("495.15"));
     }
@@ -104,7 +104,7 @@ class CartaoControllerTest {
         when(consultarSaldoUseCase.consultarSaldo(eq("nao-existe")))
                 .thenThrow(new CartaoNaoEncontradoException("nao-existe"));
 
-        mockMvc.perform(get("/cartoes/nao-existe").with(httpBasic("username", "password")))
+        mockMvc.perform(get("/cartoes/nao-existe").with(httpBasic("user", "password")))
                 .andExpect(status().isNotFound())
                 .andExpect(content().string(""));
     }

@@ -38,7 +38,7 @@ class MiniAutorizadorAcceptanceTest {
     private TestRestTemplate restTemplate;
 
     private TestRestTemplate autenticado() {
-        return restTemplate.withBasicAuth("username", "password");
+        return restTemplate.withBasicAuth("user", "password");
     }
 
     @Test
