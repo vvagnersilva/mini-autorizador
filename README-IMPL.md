@@ -27,30 +27,30 @@ onde o enunciado ([README.md](README.md)) deixou espaço para interpretação.
 
 Aplicação Spring Boot com interface REST que permite:
 
-| Operação | Endpoint | Sucesso | Falhas |
-|---|---|---|---|
-| Criar cartão (saldo inicial R$ 500,00) | `POST /cartoes` | `201` + JSON do cartão | `422` cartão já existe |
-| Consultar saldo | `GET /cartoes/{numeroCartao}` | `200` + saldo | `404` cartão inexistente |
-| Autorizar transação | `POST /transacoes` | `201` + `OK` | `422` + `SALDO_INSUFICIENTE` \| `SENHA_INVALIDA` \| `CARTAO_INEXISTENTE` |
+| Operação                              | Endpoint                        | Sucesso                   | Falhas                                                                           |
+| --------------------------------------- | ------------------------------- | ------------------------- | -------------------------------------------------------------------------------- |
+| Criar cartão (saldo inicial R$ 500,00) | `POST /cartoes`               | `201` + JSON do cartão | `422` cartão já existe                                                       |
+| Consultar saldo                         | `GET /cartoes/{numeroCartao}` | `200` + saldo           | `404` cartão inexistente                                                      |
+| Autorizar transação                   | `POST /transacoes`            | `201` + `OK`          | `422` + `SALDO_INSUFICIENTE` \| `SENHA_INVALIDA` \| `CARTAO_INEXISTENTE` |
 
 Todos os endpoints exigem autenticação HTTP Basic (`username` / `password`); sem ela a resposta é `401`.
 
 ## 2. Stack
 
-| Tecnologia | Uso |
-|---|---|
-| Java 21 | Linguagem (records, pattern matching em `equals`) |
-| Spring Boot 3.3.4 | Framework principal (Web, Validation, Security, Data JPA, Actuator) |
-| Maven | Build e gerenciamento de dependências |
-| MySQL 5.7 | Banco relacional (declarado no `docker-compose.yml` original) |
-| Apache Kafka 3.7 (KRaft) | Processamento assíncrono das autorizações |
-| Spring Kafka | Producer/consumer com serialização JSON |
-| BCrypt (Spring Security) | Hash da senha do cartão |
-| JUnit 5, Mockito, AssertJ | Testes unitários e de integração |
-| H2 + `@EmbeddedKafka` | Infraestrutura em memória para os testes de integração e aceitação |
-| Testcontainers 1.21 | MySQL 5.7 e Kafka 3.7 reais em containers para os testes E2E |
-| ArchUnit | Verificação automática das regras de camadas |
-| JaCoCo | Cobertura de testes (mínimo exigido no build: 80% de linhas) |
+| Tecnologia                | Uso                                                                     |
+| ------------------------- | ----------------------------------------------------------------------- |
+| Java 21                   | Linguagem (records, pattern matching em`equals`)                      |
+| Spring Boot 3.3.4         | Framework principal (Web, Validation, Security, Data JPA, Actuator)     |
+| Maven                     | Build e gerenciamento de dependências                                  |
+| MySQL 5.7                 | Banco relacional (declarado no`docker-compose.yml` original)          |
+| Apache Kafka 3.7 (KRaft)  | Processamento assíncrono das autorizações                            |
+| Spring Kafka              | Producer/consumer com serialização JSON                               |
+| BCrypt (Spring Security)  | Hash da senha do cartão                                                |
+| JUnit 5, Mockito, AssertJ | Testes unitários e de integração                                     |
+| H2 +`@EmbeddedKafka`    | Infraestrutura em memória para os testes de integração e aceitação |
+| Testcontainers 1.21       | MySQL 5.7 e Kafka 3.7 reais em containers para os testes E2E            |
+| ArchUnit                  | Verificação automática das regras de camadas                         |
+| JaCoCo                    | Cobertura de testes (mínimo exigido no build: 80% de linhas)           |
 
 ## 3. Como executar
 
@@ -128,6 +128,34 @@ mvn test -Dgroups=e2eTest          # só os E2E
 mvn test -DexcludedGroups=e2eTest  # tudo menos os E2E
 ```
 
+#### Rodando os testes E2E
+
+Os E2E sobem seus próprios containers (`mysql:5.7` e `apache/kafka:3.7.0`) em portas aleatórias.
+Por isso **não é preciso** subir o `docker-compose` nem a aplicação antes, e eles não conflitam
+com uma instância rodando na porta 8080. A primeira execução é mais lenta porque baixa as imagens.
+
+Para rodar só uma classe ou um único cenário:
+
+```bash
+# uma classe
+mvn test -Dgroups=e2eTest -Dtest=TransacaoE2ETest
+
+# um cenário
+mvn test -Dgroups=e2eTest -Dtest='TransacaoE2ETest#comoMaquininhaDevoTerATransacaoRecusadaComSenhaInvalida'
+```
+
+O resultado aparece no terminal, e o detalhe de cada teste fica em `target/surefire-reports/`.
+
+**Pela IDE (VS Code / IntelliJ):** abra `CartaoE2ETest` ou `TransacaoE2ETest` (pacote
+`com.vr.miniautorizador.e2e`) e use o ▶ ao lado da classe ou do método. Com Podman, a IDE precisa
+enxergar as variáveis `DOCKER_HOST` e `TESTCONTAINERS_RYUK_DISABLED`. O jeito mais simples é
+exportá-las no terminal e abrir a IDE a partir dele (ex.: `code .`).
+
+**Se aparecer `Skipped` ou `Tests run: 0`**, o Testcontainers não encontrou o Docker/Podman: os
+E2E foram pulados, e não executados. Confira se as variáveis acima foram exportadas no mesmo
+terminal e se o socket existe (`ls /run/user/$(id -u)/podman/podman.sock`). Se não existir,
+ative-o com `systemctl --user enable --now podman.socket`.
+
 ## 4. Arquitetura (Clean Architecture / Hexagonal)
 
 O código é organizado em três camadas concêntricas. A regra de dependência é sempre de fora
@@ -182,30 +210,33 @@ com.vr.miniautorizador
 
 **Domínio** — contém o que existiria mesmo sem computador: o que é um cartão, quais as regras
 para aprovar uma transação e quais os resultados possíveis.
+
 - `Cartao` é um **agregado imutável** (campos `final`, identidade pelo número do cartão).
 - As regras são POJOs sem nenhuma anotação de framework.
 - O domínio declara **portas de saída** (`RepositorioCartao`, `CodificadorDeSenha`) que
   descrevem o que ele precisa, sem saber como é implementado.
 
 **Aplicação** — implementa os casos de uso, orquestrando domínio e portas.
+
 - Cada caso de uso tem uma **porta de entrada** (`port.in`) e uma implementação (`service`).
 - `RegrasAutorizacaoConfig` é o único ponto onde as regras do domínio são registradas no
   container Spring, e define a ordem de avaliação.
 
 **Infraestrutura** — adapters que conectam o mundo externo aos casos de uso:
+
 - *Adapters de entrada (driving)*: controllers REST e o listener Kafka.
 - *Adapters de saída (driven)*: JPA/MySQL, BCrypt e o producer Kafka.
 
 ### Portas e adapters
 
-| Porta | Tipo | Adapter |
-|---|---|---|
-| `CriarCartaoUseCase` | entrada | `CriarCartaoService` ← `CartaoController` |
-| `ConsultarSaldoUseCase` | entrada | `ConsultarSaldoService` ← `CartaoController` |
+| Porta                                    | Tipo    | Adapter                                                         |
+| ---------------------------------------- | ------- | --------------------------------------------------------------- |
+| `CriarCartaoUseCase`                   | entrada | `CriarCartaoService` ← `CartaoController`                  |
+| `ConsultarSaldoUseCase`                | entrada | `ConsultarSaldoService` ← `CartaoController`               |
 | `SolicitarAutorizacaoTransacaoUseCase` | entrada | `KafkaSolicitarAutorizacaoAdapter` ← `TransacaoController` |
-| `ProcessarAutorizacaoUseCase` | entrada | `ProcessarAutorizacaoService` ← `AutorizacaoKafkaListener` |
-| `RepositorioCartao` | saída | `RepositorioCartaoJpaAdapter` (Spring Data JPA / MySQL) |
-| `CodificadorDeSenha` | saída | `BCryptCodificadorDeSenhaAdapter` (Spring Security) |
+| `ProcessarAutorizacaoUseCase`          | entrada | `ProcessarAutorizacaoService` ← `AutorizacaoKafkaListener` |
+| `RepositorioCartao`                    | saída  | `RepositorioCartaoJpaAdapter` (Spring Data JPA / MySQL)       |
+| `CodificadorDeSenha`                   | saída  | `BCryptCodificadorDeSenhaAdapter` (Spring Security)           |
 
 ### Garantia automática da arquitetura
 
@@ -218,15 +249,15 @@ A separação não depende de disciplina: `ArquiteturaLimpaTest` (ArchUnit) queb
 
 ### Padrões de projeto utilizados
 
-| Padrão | Onde |
-|---|---|
-| Ports & Adapters | Toda a fronteira entre domínio/aplicação e infraestrutura |
-| Strategy | `RegraAutorizacao` e suas implementações |
-| Chain of Responsibility (via Stream) | Avaliação em sequência das regras, parando na primeira recusa |
-| Request-Reply com Correlation ID | Comunicação HTTP ↔ Kafka |
-| Compare-and-Set | Débito atômico do saldo no banco |
-| DTO / Command | Separação entre contratos REST, comandos de aplicação e modelo de domínio |
-| Value Object imutável | `Cartao`, `SolicitacaoTransacao` (record) |
+| Padrão                              | Onde                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------ |
+| Ports & Adapters                     | Toda a fronteira entre domínio/aplicação e infraestrutura                   |
+| Strategy                             | `RegraAutorizacao` e suas implementações                                   |
+| Chain of Responsibility (via Stream) | Avaliação em sequência das regras, parando na primeira recusa               |
+| Request-Reply com Correlation ID     | Comunicação HTTP ↔ Kafka                                                    |
+| Compare-and-Set                      | Débito atômico do saldo no banco                                             |
+| DTO / Command                        | Separação entre contratos REST, comandos de aplicação e modelo de domínio |
+| Value Object imutável               | `Cartao`, `SolicitacaoTransacao` (record)                                  |
 
 ## 5. Fluxos de negócio
 
@@ -293,10 +324,10 @@ um único broker, suficiente para o desafio.
 
 ### Tópicos
 
-| Tópico | Partições | Quem publica | Quem consome |
-|---|---|---|---|
-| `mini-autorizador.autorizacao.solicitacoes` | 3 | `KafkaSolicitarAutorizacaoAdapter` | `AutorizacaoKafkaListener` (grupo `mini-autorizador-autorizador`) |
-| `mini-autorizador.autorizacao.solicitacoes.resultado.<uuid>` | auto | `AutorizacaoKafkaListener` | a própria instância que fez a solicitação |
+| Tópico                                                        | Partições | Quem publica                         | Quem consome                                                          |
+| -------------------------------------------------------------- | ----------- | ------------------------------------ | --------------------------------------------------------------------- |
+| `mini-autorizador.autorizacao.solicitacoes`                  | 3           | `KafkaSolicitarAutorizacaoAdapter` | `AutorizacaoKafkaListener` (grupo `mini-autorizador-autorizador`) |
+| `mini-autorizador.autorizacao.solicitacoes.resultado.<uuid>` | auto        | `AutorizacaoKafkaListener`         | a própria instância que fez a solicitação                         |
 
 ### Mensagens (JSON)
 
@@ -343,11 +374,11 @@ Motivos da escolha: saldo é dado financeiro, que se beneficia de transações A
 
 ### Tabela `cartao`
 
-| Coluna | Tipo | Observação |
-|---|---|---|
-| `numero_cartao` | `VARCHAR(19)` PK | Identificador natural do cartão |
-| `senha_codificada` | `VARCHAR(100)` | Hash BCrypt, nunca texto puro |
-| `saldo` | `DECIMAL(15,2)` | Valor monetário exato (`BigDecimal` no Java) |
+| Coluna               | Tipo               | Observação                                    |
+| -------------------- | ------------------ | ----------------------------------------------- |
+| `numero_cartao`    | `VARCHAR(19)` PK | Identificador natural do cartão                |
+| `senha_codificada` | `VARCHAR(100)`   | Hash BCrypt, nunca texto puro                   |
+| `saldo`            | `DECIMAL(15,2)`  | Valor monetário exato (`BigDecimal` no Java) |
 
 - O schema é gerado pelo Hibernate (`ddl-auto: update`).
 - `CartaoJpaEntity` (infraestrutura) é **separada** do agregado `Cartao` (domínio): o modelo
@@ -409,7 +440,6 @@ As técnicas usadas:
           .findFirst()
           .orElseGet(() -> debitar(cartao.getNumeroCartao(), solicitacao.valor()));
   ```
-
 - **`Optional`** para cartão inexistente (`.map(...).orElse(CARTAO_INEXISTENTE)`) e para
   cartão duplicado (`.map(throw ...).orElseGet(criar)`).
 - **Operador ternário** apenas para escolher o valor de retorno (resultado da regra ou status HTTP).
@@ -419,14 +449,14 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 
 ## 10. Segurança
 
-| Aspecto | Implementação |
-|---|---|
-| Autenticação da API | HTTP Basic com um usuário técnico em memória (`username` / `password`, configurável) |
-| Sessão | Stateless (`SessionCreationPolicy.STATELESS`), sem cookies |
-| CSRF | Desabilitado (API REST sem sessão/cookies) |
-| Endpoint público | Apenas `GET /actuator/health` |
-| Senha do cartão | Armazenada como hash **BCrypt**, comparada com `PasswordEncoder.matches` |
-| Desserialização Kafka | Restrita aos pacotes do projeto |
+| Aspecto                 | Implementação                                                                              |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| Autenticação da API   | HTTP Basic com um usuário técnico em memória (`username` / `password`, configurável) |
+| Sessão                 | Stateless (`SessionCreationPolicy.STATELESS`), sem cookies                                 |
+| CSRF                    | Desabilitado (API REST sem sessão/cookies)                                                  |
+| Endpoint público       | Apenas`GET /actuator/health`                                                               |
+| Senha do cartão        | Armazenada como hash**BCrypt**, comparada com `PasswordEncoder.matches`              |
+| Desserialização Kafka | Restrita aos pacotes do projeto                                                              |
 
 É importante distinguir as duas senhas:
 
@@ -438,14 +468,14 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 
 `GlobalExceptionHandler` centraliza a tradução de exceções para HTTP:
 
-| Situação | Status | Corpo |
-|---|---|---|
-| Cartão já existe | `422` | JSON do cartão enviado (`senha`, `numeroCartao`) |
-| Cartão não encontrado (consulta de saldo) | `404` | vazio |
-| Transação recusada | `422` | `SALDO_INSUFICIENTE` \| `SENHA_INVALIDA` \| `CARTAO_INEXISTENTE` |
-| Corpo inválido (campo ausente, valor ≤ 0) | `400` | `REQUISICAO_INVALIDA` |
-| Timeout aguardando o Kafka | `503` | `AUTORIZACAO_INDISPONIVEL` |
-| Sem autenticação / credenciais erradas | `401` | vazio |
+| Situação                                  | Status  | Corpo                                                                  |
+| ------------------------------------------- | ------- | ---------------------------------------------------------------------- |
+| Cartão já existe                          | `422` | JSON do cartão enviado (`senha`, `numeroCartao`)                  |
+| Cartão não encontrado (consulta de saldo) | `404` | vazio                                                                  |
+| Transação recusada                        | `422` | `SALDO_INSUFICIENTE` \| `SENHA_INVALIDA` \| `CARTAO_INEXISTENTE` |
+| Corpo inválido (campo ausente, valor ≤ 0) | `400` | `REQUISICAO_INVALIDA`                                                |
+| Timeout aguardando o Kafka                  | `503` | `AUTORIZACAO_INDISPONIVEL`                                           |
+| Sem autenticação / credenciais erradas    | `401` | vazio                                                                  |
 
 ## 12. Testes
 
@@ -453,20 +483,20 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 com os E2E rodando contra MySQL e Kafka reais): **70 passando, 0 falhas**.
 
 | Métrica (JaCoCo) | Cobertura |
-|---|---|
-| Linhas | 96,0% |
-| Instruções | 95,7% |
-| Branches | 87,5% |
+| ----------------- | --------- |
+| Linhas            | 96,0%     |
+| Instruções      | 95,7%     |
+| Branches          | 87,5%     |
 
-| Tipo | Classes | O que garantem |
-|---|---|---|
-| Unitários de domínio | `CartaoTest`, `SenhaCorretaRegraTest`, `SaldoSuficienteRegraTest` | Regras de negócio isoladas, incluindo limites (saldo exatamente igual ao valor) |
-| Unitários de aplicação | `CriarCartaoServiceTest`, `ConsultarSaldoServiceTest`, `ProcessarAutorizacaoServiceTest` | Orquestração com portas mockadas: ordem das regras, débito só quando tudo passa, perda de corrida no `UPDATE` |
-| Adapters | `CartaoControllerTest`, `TransacaoControllerTest`, `RepositorioCartaoJpaAdapterTest`, `BCryptCodificadorDeSenhaAdapterTest` | Contratos HTTP (status e corpo), autenticação, mapeamento JPA e débito condicional real no banco |
-| Aceitação | `MiniAutorizadorAcceptanceTest` | O roteiro da avaliação, de ponta a ponta com HTTP real + Kafka embarcado: criar, consultar, debitar até `SALDO_INSUFICIENTE`, senha inválida, cartão inexistente, 404 e 401 |
-| Concorrência | `ConcorrenciaTransacaoTest` | 10 transações paralelas → 5 aprovadas, 5 recusadas, saldo zero |
-| **E2E (infraestrutura real)** | `CartaoE2ETest`, `TransacaoE2ETest` | Os fluxos completos contra **MySQL 5.7 e Kafka 3.7 reais** (Testcontainers), incluindo a concorrência no banco de produção |
-| Arquitetura | `ArquiteturaLimpaTest` | Regras de dependência entre camadas (ArchUnit) |
+| Tipo                                | Classes                                                                                                                             | O que garantem                                                                                                                                                                    |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unitários de domínio              | `CartaoTest`, `SenhaCorretaRegraTest`, `SaldoSuficienteRegraTest`                                                             | Regras de negócio isoladas, incluindo limites (saldo exatamente igual ao valor)                                                                                                  |
+| Unitários de aplicação           | `CriarCartaoServiceTest`, `ConsultarSaldoServiceTest`, `ProcessarAutorizacaoServiceTest`                                      | Orquestração com portas mockadas: ordem das regras, débito só quando tudo passa, perda de corrida no`UPDATE`                                                                |
+| Adapters                            | `CartaoControllerTest`, `TransacaoControllerTest`, `RepositorioCartaoJpaAdapterTest`, `BCryptCodificadorDeSenhaAdapterTest` | Contratos HTTP (status e corpo), autenticação, mapeamento JPA e débito condicional real no banco                                                                               |
+| Aceitação                         | `MiniAutorizadorAcceptanceTest`                                                                                                   | O roteiro da avaliação, de ponta a ponta com HTTP real + Kafka embarcado: criar, consultar, debitar até`SALDO_INSUFICIENTE`, senha inválida, cartão inexistente, 404 e 401 |
+| Concorrência                       | `ConcorrenciaTransacaoTest`                                                                                                       | 10 transações paralelas → 5 aprovadas, 5 recusadas, saldo zero                                                                                                                 |
+| **E2E (infraestrutura real)** | `CartaoE2ETest`, `TransacaoE2ETest`                                                                                             | Os fluxos completos contra**MySQL 5.7 e Kafka 3.7 reais** (Testcontainers), incluindo a concorrência no banco de produção                                                |
+| Arquitetura                         | `ArquiteturaLimpaTest`                                                                                                            | Regras de dependência entre camadas (ArchUnit)                                                                                                                                   |
 
 Os testes de integração e aceitação usam o perfil `test` (`application-test.yml`): **H2 em modo
 MySQL** e **`@EmbeddedKafka`**. Por isso rodam sem Docker.
@@ -478,35 +508,35 @@ débito atômico sob concorrência (seção 8), depende do InnoDB do MySQL. Os t
 lacuna: exercitam **HTTP → segurança → caso de uso → Kafka → regras → MySQL → Kafka → HTTP** com
 a mesma infraestrutura do `docker-compose.yml`.
 
-| Peça | Papel |
-|---|---|
-| `@E2ETest` | Meta-anotação: perfil `test-e2e`, contexto Spring completo, `MockMvc`, limpeza do banco, tag `e2eTest` e desativação automática sem Docker |
-| `E2EContainersInitializer` | Sobe **uma vez por execução** os containers `mysql:5.7` e `apache/kafka:3.7.0`, compartilhados por todas as classes E2E, e injeta a URL do banco e os bootstrap servers no contexto |
-| `MySQLCleanUpExtension` | Esvazia a tabela `cartao` antes de cada teste; cada cenário começa com o banco vazio |
-| `MockDsl` | DSL na linguagem do negócio (`dadoUmCartao`, `criarCartao`, `consultarSaldo`, `saldoDoCartao`, `realizarTransacao`), sempre autenticada com HTTP Basic real |
-| `application-test-e2e.yml` | Tópicos e consumer group próprios dos E2E e timeout de resposta de 10 s |
+| Peça                        | Papel                                                                                                                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@E2ETest`                 | Meta-anotação: perfil`test-e2e`, contexto Spring completo, `MockMvc`, limpeza do banco, tag `e2eTest` e desativação automática sem Docker                                           |
+| `E2EContainersInitializer` | Sobe**uma vez por execução** os containers `mysql:5.7` e `apache/kafka:3.7.0`, compartilhados por todas as classes E2E, e injeta a URL do banco e os bootstrap servers no contexto |
+| `MySQLCleanUpExtension`    | Esvazia a tabela`cartao` antes de cada teste; cada cenário começa com o banco vazio                                                                                                        |
+| `MockDsl`                  | DSL na linguagem do negócio (`dadoUmCartao`, `criarCartao`, `consultarSaldo`, `saldoDoCartao`, `realizarTransacao`), sempre autenticada com HTTP Basic real                         |
+| `application-test-e2e.yml` | Tópicos e consumer group próprios dos E2E e timeout de resposta de 10 s                                                                                                                      |
 
 Cada teste verifica o resultado **pela API e direto no banco** (via `CartaoJpaRepository`):
 
-| Classe | Cenários |
-|---|---|
-| `CartaoE2ETest` (6) | Criação com saldo inicial de R$ 500,00 e senha gravada como hash BCrypt; cartão duplicado (`422`); consulta de saldo; cartão inexistente (`404`); corpo inválido (`400`); sem autenticação (`401`) |
-| `TransacaoE2ETest` (6) | Transação aprovada debitando o saldo; débitos até `SALDO_INSUFICIENTE`; `SENHA_INVALIDA` e valor inválido sem alterar o saldo; `CARTAO_INEXISTENTE`; **10 transações simultâneas → 5 aprovadas, 5 recusadas e saldo final R$ 0,00 no MySQL real** |
+| Classe                   | Cenários                                                                                                                                                                                                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CartaoE2ETest` (6)    | Criação com saldo inicial de R$ 500,00 e senha gravada como hash BCrypt; cartão duplicado (`422`); consulta de saldo; cartão inexistente (`404`); corpo inválido (`400`); sem autenticação (`401`)                                                     |
+| `TransacaoE2ETest` (6) | Transação aprovada debitando o saldo; débitos até`SALDO_INSUFICIENTE`; `SENHA_INVALIDA` e valor inválido sem alterar o saldo; `CARTAO_INEXISTENTE`; **10 transações simultâneas → 5 aprovadas, 5 recusadas e saldo final R$ 0,00 no MySQL real** |
 
 ## 13. Configuração
 
 Principais propriedades de `src/main/resources/application.yml`:
 
-| Propriedade | Padrão | Descrição |
-|---|---|---|
-| `spring.datasource.url` | `jdbc:mysql://localhost:3306/miniautorizador` | Conexão com o MySQL |
-| `spring.kafka.bootstrap-servers` | `localhost:9092` | Broker Kafka |
-| `app.seguranca.usuario` / `senha` | `username` / `password` | Credenciais do Basic Auth |
-| `app.cartao.saldo-inicial` | `500.00` | Saldo de todo cartão novo |
-| `app.kafka.topico-solicitacao-autorizacao` | `mini-autorizador.autorizacao.solicitacoes` | Tópico de solicitações |
-| `app.kafka.grupo-consumidor` | `mini-autorizador-autorizador` | Consumer group do processador |
-| `app.kafka.timeout-resposta-ms` | `5000` | Tempo máximo aguardando o resultado |
-| `server.port` | `8080` | Porta HTTP |
+| Propriedade                                  | Padrão                                         | Descrição                          |
+| -------------------------------------------- | ----------------------------------------------- | ------------------------------------ |
+| `spring.datasource.url`                    | `jdbc:mysql://localhost:3306/miniautorizador` | Conexão com o MySQL                 |
+| `spring.kafka.bootstrap-servers`           | `localhost:9092`                              | Broker Kafka                         |
+| `app.seguranca.usuario` / `senha`        | `username` / `password`                     | Credenciais do Basic Auth            |
+| `app.cartao.saldo-inicial`                 | `500.00`                                      | Saldo de todo cartão novo           |
+| `app.kafka.topico-solicitacao-autorizacao` | `mini-autorizador.autorizacao.solicitacoes`   | Tópico de solicitações            |
+| `app.kafka.grupo-consumidor`               | `mini-autorizador-autorizador`                | Consumer group do processador        |
+| `app.kafka.timeout-resposta-ms`            | `5000`                                        | Tempo máximo aguardando o resultado |
+| `server.port`                              | `8080`                                        | Porta HTTP                           |
 
 Qualquer propriedade pode ser sobrescrita por variável de ambiente (ex.: `APP_CARTAO_SALDOINICIAL=1000.00`).
 
