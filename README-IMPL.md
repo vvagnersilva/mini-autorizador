@@ -221,10 +221,6 @@ memória quando não estiver usando: `docker stop sonarqube` (os dados são mant
 O código é organizado em três camadas concêntricas. A regra de dependência é sempre de fora
 para dentro: a infraestrutura conhece a aplicação e o domínio; o domínio não conhece ninguém.
 
-<p align="center">
-  <img src="docs/arquitetura.svg" alt="Camadas concêntricas: infrastructure por fora, application no meio e domain no centro; as dependências apontam para dentro" width="760">
-</p>
-
 ### Estrutura de pacotes
 
 ```
@@ -241,7 +237,8 @@ com.vr.miniautorizador
 │   └── config                  # RegrasAutorizacaoConfig (liga as regras ao Spring)
 └── infrastructure              # Detalhes técnicos (adapters)
     ├── web                     # CartaoController, TransacaoController, GlobalExceptionHandler, DTOs
-    ├── kafka                   # KafkaSolicitarAutorizacaoAdapter, AutorizacaoKafkaListener, KafkaConfig
+    ├── kafka                   # KafkaSolicitarAutorizacaoAdapter, AutorizacaoKafkaListener, KafkaConfig,
+    │                           # KafkaTopicos, SolicitacaoTransacaoMensagem, ResultadoTransacaoMensagem
     ├── persistence             # CartaoJpaEntity, CartaoJpaRepository, RepositorioCartaoJpaAdapter
     └── security                # SecurityConfig, BCryptCodificadorDeSenhaAdapter
 ```
@@ -314,6 +311,20 @@ A separação não depende de disciplina: `ArquiteturaLimpaTest` (ArchUnit) queb
 
 `ConsultarSaldoService` busca o cartão e devolve o saldo, ou lança
 `CartaoNaoEncontradoException` → `404`.
+
+### Autorização de transação
+
+1. `TransacaoController` valida o corpo e chama `SolicitarAutorizacaoTransacaoUseCase`.
+2. `KafkaSolicitarAutorizacaoAdapter` publica a solicitação no Kafka e aguarda o resultado
+   (detalhes na [seção 6](#6-kafka)).
+3. `AutorizacaoKafkaListener` consome a mensagem e chama `ProcessarAutorizacaoService`, que
+   avalia as regras nesta ordem (a primeira recusa encerra a avaliação):
+   1. **Cartão existe?** senão `CARTAO_INEXISTENTE`
+   2. **Senha correta?** senão `SENHA_INVALIDA`
+   3. **Saldo suficiente?** senão `SALDO_INSUFICIENTE`
+   4. **Débito atômico** no banco; se o `UPDATE` não afetar nenhuma linha (outra transação
+      consumiu o saldo no meio do caminho) → `SALDO_INSUFICIENTE`; senão `APROVADA`.
+4. O resultado volta pelo Kafka e o controller responde `201 OK` ou `422` com o motivo.
 
 ## 6. Kafka
 
@@ -476,6 +487,7 @@ registrá-la em `RegrasAutorizacaoConfig`, sem alterar o motor de autorização 
 | Cartão não encontrado (consulta de saldo) | `404` | vazio                                                                  |
 | Transação recusada                        | `422` | `SALDO_INSUFICIENTE` \| `SENHA_INVALIDA` \| `CARTAO_INEXISTENTE` |
 | Corpo inválido (campo ausente, valor ≤ 0) | `400` | `REQUISICAO_INVALIDA`                                                |
+| JSON malformado (ex.: `"valor": "abc"`)   | `400` | resposta de erro padrão do Spring Boot                                 |
 | Timeout aguardando o Kafka                  | `503` | `AUTORIZACAO_INDISPONIVEL`                                           |
 | Sem autenticação / credenciais erradas    | `401` | vazio                                                                  |
 
@@ -544,7 +556,7 @@ Principais propriedades de `src/main/resources/application.yml`:
 
 | Propriedade                                  | Padrão                                         | Descrição                          |
 | -------------------------------------------- | ----------------------------------------------- | ------------------------------------ |
-| `spring.datasource.url`                    | `jdbc:mysql://localhost:3306/miniautorizador` | Conexão com o MySQL                 |
+| `spring.datasource.url`                    | `jdbc:mysql://localhost:3306/miniautorizador?createDatabaseIfNotExist=true&serverTimezone=UTC` | Conexão com o MySQL                 |
 | `spring.kafka.bootstrap-servers`           | `localhost:9092`                              | Broker Kafka                         |
 | `app.seguranca.usuario` / `senha`        | `username` / `password`                     | Credenciais do Basic Auth            |
 | `app.cartao.saldo-inicial`                 | `500.00`                                      | Saldo de todo cartão novo           |
