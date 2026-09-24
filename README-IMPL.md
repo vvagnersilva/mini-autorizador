@@ -201,14 +201,13 @@ mostra o endereço do relatório.
 
 **Acesse o relatório:**
 
-|          |                                                         |
-| -------- | ------------------------------------------------------- |
-| URL      | `http://localhost:9000/dashboard?id=mini-autorizador` |
-| Usuário | `admin`                                               |
-| Senha    | `Sonar@Local2026`                                     |
+|         |                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------- |
+| URL     | [http://localhost:9000/dashboard?id=mini-autorizador](http://localhost:9000/dashboard?id=mini-autorizador) |
+| Usuário | `admin`                                                                                           |
+| Senha   | `Sonar@Local2026`                                                                                 |
 
 Para atualizar o relatório depois de alterar o código, rode `./sonar.sh` de novo. Para liberar
-
 memória quando não estiver usando: `docker stop sonarqube` (os dados são mantidos; o próximo
 `./sonar.sh` inicia o container novamente).
 

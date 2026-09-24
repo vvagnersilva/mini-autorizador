@@ -4,13 +4,18 @@
 #
 #   ./sonar.sh
 #
-# 1. Sobe o SonarQube local em container (cria na primeira vez; depois so inicia)
-# 2. Aguarda o servidor ficar disponivel
-# 3. Define a senha do usuario admin (na primeira execucao)
-# 4. Gera um token de analise
-# 5. Roda os testes (com cobertura do JaCoCo) e envia a analise
+# Pre-requisitos: Docker (ou Podman com o comando docker), Maven e JDK 21.
 #
-# Ao final, basta acessar a URL exibida com o usuario admin e a senha abaixo.
+# Etapas:
+#   1. Sobe o SonarQube local em container (cria na primeira vez; depois so inicia)
+#   2. Aguarda o servidor ficar disponivel
+#   3. Troca a senha padrao do admin pela senha do projeto (so na primeira execucao)
+#   4. Gera um novo token de analise (revogando o anterior)
+#   5. Roda os testes (com cobertura do JaCoCo) e envia a analise
+#
+# Ao final, exibe a URL do relatorio, o usuario (admin) e a senha (SONAR_PASSWORD).
+# O nome do container e a porta podem ser trocados pelas variaveis de ambiente
+# SONAR_CONTAINER e SONAR_PORT, por exemplo: SONAR_PORT=9001 ./sonar.sh
 #
 set -euo pipefail
 
