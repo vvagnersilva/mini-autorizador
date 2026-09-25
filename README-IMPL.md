@@ -221,6 +221,10 @@ memória quando não estiver usando: `docker stop sonarqube` (os dados são mant
 O código é organizado em três camadas concêntricas. A regra de dependência é sempre de fora
 para dentro: a infraestrutura conhece a aplicação e o domínio; o domínio não conhece ninguém.
 
+<p align="center">
+  <img src="arquitetura.svg" alt="Camadas concêntricas: infrastructure por fora, application no meio e domain no centro; as dependências apontam para dentro" width="760">
+</p>
+
 ### Estrutura de pacotes
 
 ```
